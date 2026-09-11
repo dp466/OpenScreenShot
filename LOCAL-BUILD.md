@@ -1,11 +1,11 @@
-# OpenScreenShot Local 2.1.2 — Français / English
+# OpenScreenShot Local 2.1.3 — Français / English
 
 Custom, unofficial build based on OpenScreenShot commit
 `16ed3c5f15f93ed15dff639cc2ee7908797df101` (upstream version 2.1.0).
 Upstream source: https://github.com/pghqdev/OpenScreenShot
 The MIT license and upstream attribution are retained.
 
-## Mise à jour depuis la version 2.1.1
+## Mise à jour depuis la version 2.1.2
 
 1. Extrayez le nouveau ZIP.
 2. Remplacez le contenu du dossier **extension déjà chargé dans Chrome** par le contenu du nouveau dossier **extension**, en conservant le même emplacement.
@@ -16,11 +16,29 @@ La préférence est enregistrée uniquement dans le stockage local de l’extens
 
 Cette mise à jour traduit les menus, boutons de capture de zone, écrans de résultats, avertissements connus, éditeur et commandes d’enregistrement. Les titres des pages capturées et le contenu des captures ne sont pas traduits. Les messages techniques inconnus fournis par le navigateur restent intacts.
 
-## Upgrade from 2.1.1
+## Upgrade from 2.1.2
 
 Replace the contents of the **existing loaded extension folder** with the new `extension` folder contents, keeping the same folder path. Click **Reload** on its `chrome://extensions` card. Do not uninstall it or load it from a new location if you want to retain its existing local captures and settings.
 
 French is the default. Use **Settings → Appearance → Interface language** to choose French, English, or the browser language. The selected language is stored locally. Existing editor/result tabs retain their current work and use the new language on their next opening. Native browser screens and save dialogs follow Chrome/the operating system.
+
+## Nouveau : nom de fichier et filigrane facultatif
+
+Dans **Paramètres**, activez **Demander un nom de fichier et ajouter un filigrane à chaque page**, sous les réglages de capture. Cette option est **désactivée par défaut** et s’applique aux prochaines captures, y compris les captures de zone et de partie visible.
+
+À la fin de la capture, une boîte de dialogue propose un nom modifiable. Cliquez sur **Utiliser ce nom**, puis enregistrez le PDF ou les PNG depuis les résultats. Le nom choisi apparaît en bas à droite de **chaque page PDF**, même la dernière page courte, et de **chaque section PNG**. Le filigrane utilise un texte sombre sur un fond blanc translucide. Les accents français sont conservés; les noms longs peuvent occuper deux lignes.
+
+Par exemple, `Dossier Québec 2026` donne `Dossier Québec 2026.pdf` ou `Dossier Québec 2026_part-001.png`, `Dossier Québec 2026_part-002.png`, etc. Le filigrane affiche toujours `Dossier Québec 2026`, sans suffixe de section ni extension ajoutée.
+
+**Annuler** conserve la capture localement. **Nommer cette capture** permet de reprendre; **Modifier le nom du fichier** permet ensuite de renommer. Les originaux restent sans filigrane : celui-ci est ajouté aux copies exportées. Une section ouverte dans l’éditeur conserve le nom pour ses exports PNG, JPEG, WebP, PDF et pour la copie d’image. Le filigrane est ajouté après les modifications et le redimensionnement; l’aperçu de travail conserve les pixels originaux.
+
+Le réglage est mémorisé avec chaque capture. Le désactiver concerne les nouvelles captures; les résultats déjà ouverts conservent leur choix. Si une action rapide de copie ou d’enregistrement était sélectionnée, le nom est demandé avant tout export. Le dialogue du navigateur peut ensuite demander où enregistrer le fichier. Renommer un fichier dans ce dialogue ou dans l’explorateur ne modifie pas un filigrane déjà généré : utilisez **Modifier le nom du fichier** avant l’export pour garder les deux identiques.
+
+## New: optional filename prompt and watermark
+
+In **Settings**, enable **Ask for a filename and watermark each page**. It is **off by default** and applies to new full-page, visible-area, and region captures. When capture finishes, choose a name, confirm it, then save the PDF or PNG sections from the results. The same base name is stamped at the bottom-right of every physical PDF page and every PNG section. PNG filenames add `_part-001`, `_part-002`, and so on; their watermark uses the shared base name.
+
+Cancelling preserves the capture and lets you return to naming later. You can edit the name before exporting again. Original pixels remain unstamped in local storage, so renaming never stacks watermarks. Editor exports and image copying retain the capture’s chosen watermark, including after cropping, resizing, or PDF pagination. Working previews show the editable original. The option is saved with each capture; switching it off affects new captures. When enabled, it takes precedence over quick-copy/quick-save actions so export cannot occur before naming. Renaming in the browser’s save dialog or file manager does not change an already rendered watermark; edit the name in the extension before export instead.
 
 ## Install the ready-to-use extension
 
@@ -85,4 +103,4 @@ Relevant implementation files:
 
 The automated suite covers normal and clipped scrollers, image loading/decode waits, timeout and cancellation behavior, exact restoration, section boundaries, tab switching and closure, storage errors, PDF pagination, localization, and accessibility guards. A 180,125px page at normal scale is checked for continuous coverage across 12 sections. Integration tests also check an exact 117,812px page without zooming out.
 
-This release is validated with the full automated suite, TypeScript, ESLint, formatting of changed files, and the production build. See BUILD-INFO.json in the delivered package for the exact test count. New tests check French menus on an English browser, language persistence, translated region/recording controls, and message substitutions without altering user content. Browser preview navigation to the local test fixtures was rejected with `net::ERR_BLOCKED_BY_CLIENT` and a browser URL-policy denial. No live browser/installed-extension or site-specific visual test is claimed. The browser's installation flow, rendered settings/results, real download dialogs, and your particular website still need a local trial. Begin with a non-sensitive sample page and inspect the last section and image-heavy areas before relying on the result.
+This release is validated with the full automated suite, TypeScript, ESLint, formatting of changed files, and the production build. See BUILD-INFO.json in the delivered package for the exact test count. New tests cover the on/off capture routing, canonical filename validation, local name persistence, naming/history round trips, PDF page placement, long names, French accents, PNG resource cleanup, and editor resizing before watermarking. Actual two-page PDF and PNG outputs were generated with the export code using native canvas and visually inspected after Poppler rendering; the short final PDF page retained its watermark at the page bottom. This checks exported files, not live Chrome UI behavior. Browser preview navigation to the local test fixtures was rejected with `net::ERR_BLOCKED_BY_CLIENT` and a browser URL-policy denial. No live browser/installed-extension or site-specific visual test is claimed. The browser's installation flow, rendered settings/results, real download dialogs, and your particular website still need a local trial. Begin with a non-sensitive sample page and inspect the last section and image-heavy areas before relying on the result.

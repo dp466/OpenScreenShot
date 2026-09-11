@@ -113,6 +113,8 @@ import {
   takeExpressNote,
 } from '../shared/storage';
 import { formatFilename } from '../shared/utils';
+import { normalizeExportName, validateExportName } from '../shared/export-name';
+import { drawWatermark, ensureWatermarkFont } from '../shared/watermark';
 import { applyTheme, watchSystemTheme } from '../shared/theme';
 import { COLOR_PALETTE, pushRecent } from './palette';
 import {
@@ -2311,6 +2313,8 @@ export function useEditor() {
             url: p.history.url,
             capturedAt: p.history.capturedAt,
             id: p.history.id,
+            exportName: p.history.exportName,
+            filenameWatermark: p.history.filenameWatermark,
           }
         : {
             dataUrl: p.dataUrl,
@@ -2410,6 +2414,7 @@ export function useEditor() {
   const dismissStageNotice = useCallback(() => setStageNotice(null), []);
 
   const defaultFilename = useCallback(() => {
+    if (capture?.filenameWatermark && capture.exportName !== undefined) return capture.exportName;
     const tmpl = settings?.filenameTemplate ?? 'screenshot_{date}_{time}';
     return formatFilename(tmpl, {
       width: visibleSize?.w ?? 0,
@@ -2425,18 +2430,19 @@ export function useEditor() {
       if (!c || !c.image) return;
       setExporting(true);
       try {
-        const composed = c.composeFinal();
-        const canvas =
-          targetWidth && targetWidth !== composed.width
-            ? resampleToWidth(composed, targetWidth)
-            : composed;
+        const name = editorExportName(capture, filenameBase);
+        const canvas = await composeEditorExport(
+          c,
+          capture?.filenameWatermark ? name : undefined,
+          targetWidth,
+        );
         const dataUrl = canvasToDataUrl(canvas, format, quality);
-        await downloadDataUrl(dataUrl, withExtension(filenameBase, format));
+        await downloadDataUrl(dataUrl, withExtension(name, format));
       } finally {
         setExporting(false);
       }
     },
-    [],
+    [capture],
   );
 
   // Copy the composed image (with annotations) to the clipboard as PNG —
@@ -2444,11 +2450,14 @@ export function useEditor() {
   const copyImage = useCallback(async () => {
     const c = controllerRef.current;
     if (!c || !c.image) return;
-    const canvas = c.composeFinal();
+    const watermark = capture?.filenameWatermark
+      ? editorExportName(capture, defaultFilename())
+      : undefined;
+    const canvas = await composeEditorExport(c, watermark);
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
     if (!blob) throw new Error('Could not encode PNG');
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-  }, []);
+  }, [capture, defaultFilename]);
 
   // Pin the composed image (with annotations, crop and beautify frame — the
   // same picture Copy/Export would produce) in a floating always-on-top
@@ -2510,24 +2519,36 @@ export function useEditor() {
     pinRepaint.trigger();
   }, [annotations, frame, bands, imageSize, pinRepaint]);
 
-  const exportPdf = useCallback(async (opts: PdfOptions, filenameBase: string) => {
-    const c = controllerRef.current;
-    if (!c || !c.image) return;
-    setExporting(true);
-    setExportProgress(null);
-    try {
-      const canvas = c.composeFinal();
-      // onProgress only ever fires from pdf.ts's multi-page loop — the one
-      // stage in the whole export path with real, per-page work to report
-      // (R-23a). Single-page/full-page PDFs and every image format stay
-      // null here, which is what tells the dialog to show the indeterminate
-      // spinner instead of a bar with nothing real to plot.
-      await exportPdfFile(canvas, opts, `${filenameBase}.pdf`, (p) => setExportProgress(p));
-    } finally {
-      setExporting(false);
+  const exportPdf = useCallback(
+    async (opts: PdfOptions, filenameBase: string) => {
+      const c = controllerRef.current;
+      if (!c || !c.image) return;
+      setExporting(true);
       setExportProgress(null);
-    }
-  }, []);
+      try {
+        const name = editorExportName(capture, filenameBase);
+        const canvas = c.composeFinal();
+        // onProgress only ever fires from pdf.ts's multi-page loop — the one
+        // stage in the whole export path with real, per-page work to report
+        // (R-23a). Single-page/full-page PDFs and every image format stay
+        // null here, which is what tells the dialog to show the indeterminate
+        // spinner instead of a bar with nothing real to plot.
+        // The writer stamps each physical PDF page, including a short final
+        // tile. Stamping this source canvas would mark only its last slice.
+        await exportPdfFile(
+          canvas,
+          opts,
+          `${name}.pdf`,
+          (p) => setExportProgress(p),
+          capture?.filenameWatermark ? name : undefined,
+        );
+      } finally {
+        setExporting(false);
+        setExportProgress(null);
+      }
+    },
+    [capture],
+  );
 
   // Screen position (relative to canvas) + display size for the text overlay.
   const textOverlayPos = useCallback(
@@ -2722,4 +2743,30 @@ export function isTypingTarget(t: EventTarget | null): boolean {
  */
 export function hasLoadedImage(capture: LastCapture | null, error: string | null): boolean {
   return capture !== null && error === null;
+}
+
+/** Keep a stored base exact; only newly typed names cross the normalization boundary. */
+export function editorExportName(capture: LastCapture | null, input: string): string {
+  if (!capture?.filenameWatermark) return input;
+  return input === capture.exportName ? validateExportName(input) : normalizeExportName(input);
+}
+
+/** Stamp the final output after edits and resizing, leaving the editor's source reusable. */
+export async function composeEditorExport(
+  controller: Pick<CanvasController, 'composeFinal'>,
+  watermark?: string,
+  targetWidth?: number,
+): Promise<HTMLCanvasElement> {
+  const composed = controller.composeFinal();
+  const canvas =
+    targetWidth && targetWidth !== composed.width
+      ? resampleToWidth(composed, targetWidth)
+      : composed;
+  if (watermark !== undefined) {
+    await ensureWatermarkFont(watermark);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas 2D context unavailable');
+    drawWatermark(ctx, watermark, canvas.width, canvas.height);
+  }
+  return canvas;
 }

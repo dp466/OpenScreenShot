@@ -1137,6 +1137,24 @@ function SettingsView({
         </div>
         <div class="settings-row settings-row-switch">
           <div class="settings-copy">
+            <label class="settings-label" for="filename-watermark">
+              {t('watermarkOptionLabel')}
+            </label>
+            <p class="settings-hint" id="filename-watermark-hint">
+              {t('watermarkOptionHint')}
+            </p>
+          </div>
+          <input
+            id="filename-watermark"
+            type="checkbox"
+            class="switch"
+            aria-describedby="filename-watermark-hint"
+            checked={settings.filenameWatermark}
+            onChange={(e) => onChange({ filenameWatermark: e.currentTarget.checked })}
+          />
+        </div>
+        <div class="settings-row settings-row-switch">
+          <div class="settings-copy">
             <label class="settings-label" for="express-mode">
               {t('expressLabel')}
             </label>

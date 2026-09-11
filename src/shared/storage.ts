@@ -250,6 +250,8 @@ async function migrateLegacyCaptureLocked(): Promise<void> {
     title: legacy.title,
     url: legacy.url,
     capturedAt: legacy.capturedAt,
+    exportName: legacy.exportName,
+    filenameWatermark: legacy.filenameWatermark,
     imageBytes: legacy.dataUrl.length,
   };
   const existing = await readCaptureList();
@@ -290,6 +292,8 @@ export async function setLastCapture(capture: LastCapture): Promise<void> {
     title: capture.title,
     url: capture.url,
     capturedAt: capture.capturedAt,
+    exportName: capture.exportName,
+    filenameWatermark: capture.filenameWatermark,
     imageBytes: capture.dataUrl.length,
   };
   await withCaptureLock(async () => {
@@ -334,6 +338,8 @@ export async function openCapture(id: string): Promise<LastCapture | null> {
     title: entry.title,
     url: entry.url,
     capturedAt: entry.capturedAt,
+    exportName: entry.exportName,
+    filenameWatermark: entry.filenameWatermark,
     id: entry.id,
   };
 }

@@ -13,7 +13,8 @@ vi.mock('../../src/background/section-stitcher', () => ({
 vi.mock('../../src/shared/storage', () => ({
   getSettings: async () => ({
     captureDelay: 0,
-    captureAction: 'editor',
+    captureAction,
+    filenameWatermark,
     expressMode: true,
     scrollDelayMs: 1500,
     waitForImages: true,
@@ -107,6 +108,8 @@ let pageHeight: number;
 let closeOnSecondScroll: boolean;
 let pageUnavailable: boolean;
 let regionLabels: unknown;
+let filenameWatermark: boolean;
+let captureAction: 'editor' | 'download' | 'clipboard';
 function makeChrome() {
   const noop = vi.fn(async () => undefined);
   return {
@@ -138,6 +141,7 @@ function makeChrome() {
     contextMenus: { onClicked: { addListener: noop }, update: noop, create: noop },
     i18n: { getMessage: (key: string) => key, getUILanguage: () => 'en' },
     windows: { WINDOW_ID_CURRENT: -2 },
+    downloads: { download: vi.fn(async () => 1) },
     tabs: {
       query: async () =>
         pageUnavailable
@@ -240,6 +244,8 @@ beforeEach(async () => {
   pageHeight = 1500;
   closeOnSecondScroll = false;
   pageUnavailable = false;
+  filenameWatermark = false;
+  captureAction = 'editor';
   fakeChrome = makeChrome();
   vi.stubGlobal('chrome', fakeChrome);
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -252,6 +258,47 @@ afterEach(() => {
 });
 
 describe('screenshot capture overlay lifecycle', () => {
+  it.each(
+    ['full-page', 'visible', 'region'].flatMap((mode) =>
+      (['editor', 'download', 'clipboard'] as const).map((action) => ({ mode, action })),
+    ),
+  )('defers $mode/$action delivery until the filename is chosen', async ({ mode, action }) => {
+    filenameWatermark = true;
+    captureAction = action;
+    await capture(mode);
+    expect(finishedBundle).toMatchObject({ requestFilename: true, mode, incomplete: false });
+    expect(bundle?.parts).toHaveLength(1);
+    expect(destinations).toEqual(['src/capture-results/index.html?id=local-test-capture']);
+    expect(fakeChrome.downloads.download).not.toHaveBeenCalled();
+    expect(events).not.toContain('copyImageToClipboard');
+    expect(messages.some((m) => m.type === 'CAPTURE_COMPLETE')).toBe(true);
+    expect(events.at(-1)).toBe('overlay:remove');
+    // Naming metadata must never be burned into the only saved original.
+    expect(partData).toEqual([
+      mode === 'visible' ? 'data:image/png;base64,tile' : 'data:image/png;base64,finished',
+    ]);
+  });
+
+  it('retains all long-page sections for the end-of-capture naming prompt', async () => {
+    filenameWatermark = true;
+    pageHeight = 117812;
+    await capture();
+    expect(bundle).toMatchObject({ requestFilename: true, height: 117812, incomplete: false });
+    expect(bundle!.parts.length).toBeGreaterThan(1);
+    expect(destinations).toEqual(['src/capture-results/index.html?id=local-test-capture']);
+    expect(fakeChrome.downloads.download).not.toHaveBeenCalled();
+  });
+
+  it('keeps the captured original if opening the naming screen fails', async () => {
+    filenameWatermark = true;
+    failAt = 'deliver';
+    await capture('visible');
+    expect(bundle?.parts).toHaveLength(1);
+    expect(bundle?.incomplete).toBe(false);
+    expect(messages.some((m) => m.type === 'CAPTURE_ERROR')).toBe(true);
+    expect(messages.some((m) => m.type === 'CAPTURE_COMPLETE')).toBe(false);
+  });
+
   it('shows progress between full-page tiles and hides before every snapshot', async () => {
     await capture();
     expect(captures).toBe(3);

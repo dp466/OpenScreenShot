@@ -1,7 +1,8 @@
 /**
  * Minimal PDF writer — replaces jsPDF (386KB) for our one use case: laying
  * out raster screenshots onto pages. We only ever place images, so this emits
- * a bare PDF with one image XObject per page.
+ * a bare PDF with one screenshot image XObject per page and an optional small,
+ * alpha-masked watermark image at the physical page's bottom-right.
  *
  * Images are stored losslessly as raw DeviceRGB samples under /FlateDecode,
  * compressed with the browser-native CompressionStream (no zlib dependency).
@@ -10,6 +11,8 @@
  * PDF coordinates are points (1/72") with a bottom-left origin; callers pass
  * top-left placements and we flip the y-axis here.
  */
+import { drawWatermark, ensureWatermarkFont } from '../shared/watermark';
+
 export interface PlacedImage {
   canvas: HTMLCanvasElement;
   xPt: number;
@@ -22,6 +25,7 @@ export interface PdfPage {
   widthPt: number;
   heightPt: number;
   image: PlacedImage;
+  watermark?: string;
 }
 
 const enc = new TextEncoder();
@@ -71,6 +75,52 @@ export async function encodeImage(canvas: HTMLCanvasElement): Promise<EncodedIma
   return { width, height, data: await deflate(rgb) };
 }
 
+interface EncodedWatermark extends EncodedImage {
+  alpha: Uint8Array<ArrayBuffer>;
+  xPt: number;
+  yPt: number;
+  wPt: number;
+  hPt: number;
+}
+
+/** Only a narrow footer strip is rasterized, never a second page-sized canvas. */
+async function encodeWatermark(page: PdfPage, text: string): Promise<EncodedWatermark> {
+  await ensureWatermarkFont(text);
+  const margin = Math.min(12, page.widthPt / 8, page.heightPt / 8);
+  const wPt = Math.min(1200, page.widthPt - 2 * margin);
+  const hPt = Math.min(36, page.heightPt - 2 * margin);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.ceil(wPt * 2));
+  canvas.height = Math.max(1, Math.ceil(hPt * 2));
+  try {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas 2D context unavailable');
+    drawWatermark(ctx, text, canvas.width, canvas.height, { margin: 0, padding: 8, fontSize: 20 });
+    const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const rgb = new Uint8Array(canvas.width * canvas.height * 3);
+    const alpha = new Uint8Array(canvas.width * canvas.height);
+    for (let i = 0, j = 0, pixel = 0; i < data.length; i += 4, j += 3, pixel++) {
+      rgb[j] = data[i];
+      rgb[j + 1] = data[i + 1];
+      rgb[j + 2] = data[i + 2];
+      alpha[pixel] = data[i + 3];
+    }
+    return {
+      width: canvas.width,
+      height: canvas.height,
+      data: await deflate(rgb),
+      alpha: await deflate(alpha),
+      xPt: page.widthPt - margin - wPt,
+      yPt: margin,
+      wPt,
+      hPt,
+    };
+  } finally {
+    canvas.width = 0;
+    canvas.height = 0;
+  }
+}
+
 class ByteBuffer {
   private parts: Uint8Array<ArrayBuffer>[] = [];
   len = 0;
@@ -102,8 +152,10 @@ export async function buildPdfSequential(
   if (!Number.isSafeInteger(pageCount) || pageCount < 1) {
     throw new Error('PDF export needs at least one page.');
   }
-  const objCount = 2 + pageCount * 3; // catalog + pages tree + (page, content, image) per page
-  const offsets: number[] = new Array(objCount + 1).fill(0);
+  // Keep core object numbers stable; optional watermark + mask objects follow
+  // those reserved IDs so streaming/mixed pages need no advance materialization.
+  let nextExtraObject = 3 + pageCount * 3;
+  const offsets: number[] = new Array(nextExtraObject).fill(0);
   const b = new ByteBuffer();
 
   b.ascii('%PDF-1.7\n');
@@ -127,18 +179,28 @@ export async function buildPdfSequential(
     const contentNum = pageNum + 1;
     const imgNum = pageNum + 2;
     const img = await encodeImage(p.image.canvas);
+    const watermark = p.watermark?.trim() ? await encodeWatermark(p, p.watermark) : undefined;
+    const watermarkNum = watermark ? nextExtraObject++ : 0;
+    const maskNum = watermark ? nextExtraObject++ : 0;
     const { image } = p;
     const yFlip = p.heightPt - image.yPt - image.hPt;
-    const content =
+    let content =
       `q\n${fmt(image.wPt)} 0 0 ${fmt(image.hPt)} ${fmt(image.xPt)} ${fmt(yFlip)} cm\n` +
       `/Im0 Do\nQ\n`;
+    if (watermark) {
+      content +=
+        `q\n${fmt(watermark.wPt)} 0 0 ${fmt(watermark.hPt)} ` +
+        `${fmt(watermark.xPt)} ${fmt(watermark.yPt)} cm\n/Wm0 Do\nQ\n`;
+    }
     const contentBytes = enc.encode(content);
 
     startObj(pageNum);
     b.ascii(
       `${pageNum} 0 obj\n<< /Type /Page /Parent 2 0 R ` +
         `/MediaBox [0 0 ${fmt(p.widthPt)} ${fmt(p.heightPt)}] ` +
-        `/Resources << /XObject << /Im0 ${imgNum} 0 R >> >> ` +
+        `/Resources << /XObject << /Im0 ${imgNum} 0 R ` +
+        (watermark ? `/Wm0 ${watermarkNum} 0 R ` : '') +
+        `>> >> ` +
         `/Contents ${contentNum} 0 R >>\nendobj\n`,
     );
 
@@ -156,11 +218,33 @@ export async function buildPdfSequential(
     );
     b.push(img.data);
     b.ascii('\nendstream\nendobj\n');
+    if (watermark) {
+      startObj(watermarkNum);
+      b.ascii(
+        `${watermarkNum} 0 obj\n<< /Type /XObject /Subtype /Image ` +
+          `/Width ${watermark.width} /Height ${watermark.height} ` +
+          `/ColorSpace /DeviceRGB /BitsPerComponent 8 /SMask ${maskNum} 0 R ` +
+          `/Filter /FlateDecode /Length ${watermark.data.length} >>\nstream\n`,
+      );
+      b.push(watermark.data);
+      b.ascii('\nendstream\nendobj\n');
+
+      startObj(maskNum);
+      b.ascii(
+        `${maskNum} 0 obj\n<< /Type /XObject /Subtype /Image ` +
+          `/Width ${watermark.width} /Height ${watermark.height} ` +
+          `/ColorSpace /DeviceGray /BitsPerComponent 8 ` +
+          `/Filter /FlateDecode /Length ${watermark.alpha.length} >>\nstream\n`,
+      );
+      b.push(watermark.alpha);
+      b.ascii('\nendstream\nendobj\n');
+    }
     i++;
   }
   if (i !== pageCount) throw new Error('PDF page count changed during export.');
 
   const xrefOff = b.len;
+  const objCount = nextExtraObject - 1;
   b.ascii(`xref\n0 ${objCount + 1}\n0000000000 65535 f \n`);
   for (let i = 1; i <= objCount; i++) {
     b.ascii(`${String(offsets[i]).padStart(10, '0')} 00000 n \n`);

@@ -8,9 +8,8 @@
  * the service worker itself only orchestrates and captures viewport tiles with
  * `chrome.tabs.captureVisibleTab`.
  *
- * After a capture completes, the image is stashed in storage, then delivered per
- * the user's capture action: opened in the editor, copied to the clipboard, or
- * downloaded directly.
+ * After a capture completes, it is saved locally. Naming-enabled captures open
+ * the results prompt before export; other captures follow the user's action.
  */
 import type { CaptureMode, CaptureRequest, PopupMessage } from '../shared/types';
 import {
@@ -509,6 +508,8 @@ async function captureFullPage(tab: chrome.tabs.Tab): Promise<void> {
     title: tab.title ?? '',
     url: tab.url ?? '',
     output: settings.longPageOutput,
+    mode: 'full-page',
+    requestFilename: settings.filenameWatermark,
   });
   const windowId = tab.windowId ?? chrome.windows.WINDOW_ID_CURRENT;
   const dpr = metrics.devicePixelRatio;
@@ -552,7 +553,12 @@ async function captureFullPage(tab: chrome.tabs.Tab): Promise<void> {
     await finishCaptureBundle(bundle.id, result);
     const finished = await getCaptureBundle(bundle.id);
     if (!finished?.parts.length) throw new Error('No capture sections were saved.');
-    if (finished.parts.length === 1 && !result.incomplete && result.warnings.length === 0) {
+    if (
+      !settings.filenameWatermark &&
+      finished.parts.length === 1 &&
+      !result.incomplete &&
+      result.warnings.length === 0
+    ) {
       const dataUrl = await readCapturePart(bundle.id, 0);
       const delivered = await deliverCapture(
         tabId,
@@ -562,6 +568,7 @@ async function captureFullPage(tab: chrome.tabs.Tab): Promise<void> {
         'full-page',
         tab.title ?? '',
         tab.url ?? '',
+        false,
       );
       if (delivered) {
         await deleteCaptureBundle(bundle.id);
@@ -623,10 +630,9 @@ async function removeCaptureProgress(tabId: number): Promise<void> {
 }
 
 /**
- * Deliver a finished capture the way the user asked for. Every path stashes the
- * capture first, so the popup's "Reopen last" link still works after a quick
- * capture. Settings are read here rather than passed down: a full-page capture
- * can take seconds, and the newest value is the one the user meant.
+ * Save a finished capture before opening its naming prompt or taking the quick
+ * action. Full-page jobs pass their original naming choice so changing the
+ * option during a long scan affects only the next capture.
  *
  * Returns whether delivery actually happened — callers broadcast `CAPTURE_COMPLETE`
  * only on `true`, so a failed clipboard copy doesn't chase its own `CAPTURE_ERROR`
@@ -640,9 +646,34 @@ async function deliverCapture(
   mode: CaptureMode,
   title: string,
   url: string,
+  requestFilename?: boolean,
 ): Promise<boolean> {
-  await setLastCapture({ dataUrl, width, height, mode, title, url, capturedAt: Date.now() });
   const settings = await getSettings();
+  if (requestFilename ?? normalizeFullPageSettings(settings).filenameWatermark) {
+    const bundle = await createCaptureBundle({
+      title,
+      url,
+      output: normalizeFullPageSettings(settings).longPageOutput,
+      mode,
+      requestFilename: true,
+    });
+    try {
+      await appendCapturePart(bundle.id, { dataUrl, width, height, y: 0 });
+      await finishCaptureBundle(bundle.id, { height, warnings: [], incomplete: false });
+      await chrome.tabs.create({
+        url: chrome.runtime.getURL(
+          `src/capture-results/index.html?id=${encodeURIComponent(bundle.id)}`,
+        ),
+      });
+      await restoreRecBadge();
+      return true;
+    } catch (error) {
+      const saved = await getCaptureBundle(bundle.id).catch(() => null);
+      if (!saved?.parts.length) await deleteCaptureBundle(bundle.id).catch(() => undefined);
+      throw error;
+    }
+  }
+  await setLastCapture({ dataUrl, width, height, mode, title, url, capturedAt: Date.now() });
   const action = normalizeCaptureAction(settings.captureAction);
 
   if (action === 'editor') {

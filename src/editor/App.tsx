@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { isTypingTarget, useEditor } from './useEditor';
+import { editorExportName, isTypingTarget, useEditor } from './useEditor';
+import { ExportNameError } from '../shared/export-name';
 import {
   OVERFLOW_TOOLS,
   PRIMARY_TOOLS,
@@ -77,9 +78,15 @@ import { t } from './i18n';
 
 type DialogFormat = ImageFormat | 'pdf';
 
+/** Only validation errors expose a specific message; other export failures stay generic. */
+export function editorExportErrorMessage(error: unknown): string {
+  return t(error instanceof ExportNameError ? error.messageKey : 'editorExportError');
+}
+
 export function App() {
   const ed = useEditor();
   const [exportOpen, setExportOpen] = useState(false);
+  const [requestedExportFormat, setRequestedExportFormat] = useState<DialogFormat>();
   const [sheetOpen, setSheetOpen] = useState(false);
   // The popup's History footer link opens the editor with ?history=1 (see
   // openHistory() in popup/App.tsx) — read once, at mount, same as the
@@ -207,6 +214,11 @@ export function App() {
     setRatePrompt(false);
   }
 
+  function openExportDialog(format?: DialogFormat) {
+    setRequestedExportFormat(format);
+    setExportOpen(true);
+  }
+
   function copyToClipboard() {
     ed.copyImage()
       .then(() => {
@@ -235,9 +247,15 @@ export function App() {
     try {
       await ed.exportPdf(opts, ed.defaultFilename());
       void recordSuccess();
-    } catch {
-      setPdfFailed(true);
-      setTimeout(() => setPdfFailed(false), 1500);
+    } catch (error) {
+      if (error instanceof ExportNameError) {
+        // The export dialog displays the invalid stored name and its localized
+        // validation error, giving the user a field in which to correct it.
+        openExportDialog('pdf');
+      } else {
+        setPdfFailed(true);
+        setTimeout(() => setPdfFailed(false), 1500);
+      }
     }
   }
 
@@ -261,7 +279,7 @@ export function App() {
       if (isTypingTarget(e.target)) return;
       if ((e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'S')) {
         e.preventDefault();
-        if (ed.hasImage) setExportOpen(true);
+        if (ed.hasImage) openExportDialog();
         return;
       }
       if (e.key === '?') {
@@ -421,7 +439,7 @@ export function App() {
             class="btn-primary"
             title={t('editorSaveImageTitle')}
             disabled={!ed.hasImage}
-            onClick={() => setExportOpen(true)}
+            onClick={() => openExportDialog()}
           >
             {t('editorSaveImage')}
           </button>
@@ -617,6 +635,7 @@ export function App() {
       {exportT.mounted ? (
         <ExportDialog
           ed={ed}
+          requestedFormat={requestedExportFormat}
           onClose={() => setExportOpen(false)}
           onSuccess={() => void recordSuccess()}
           closing={exportT.closing}
@@ -900,16 +919,18 @@ function isLight(hex: string): boolean {
 
 function ExportDialog({
   ed,
+  requestedFormat,
   onClose,
   onSuccess,
   closing,
 }: {
   ed: ReturnType<typeof useEditor>;
+  requestedFormat?: DialogFormat;
   onClose: () => void;
   onSuccess: () => void;
   closing: boolean;
 }) {
-  const df = ed.settings?.defaultFormat ?? 'png';
+  const df = requestedFormat ?? ed.settings?.defaultFormat ?? 'png';
   const initialFormat: DialogFormat =
     df === 'pdf' || df === 'png' || df === 'jpeg' || df === 'webp' ? df : 'png';
   const [format, setFormat] = useState<DialogFormat>(initialFormat);
@@ -939,7 +960,14 @@ function ExportDialog({
   const [marginNotice, setMarginNotice] = useState<string | null>(null);
   const [remember, setRemember] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [exportError, setExportError] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(() => {
+    try {
+      editorExportName(ed.capture, filenameBase);
+      return null;
+    } catch (error) {
+      return editorExportErrorMessage(error);
+    }
+  });
 
   // ed.settings is loaded once at editor mount and never refreshes, so a
   // previous export's "Remember these settings" write is invisible to the
@@ -947,11 +975,16 @@ function ExportDialog({
   // the same tab reflects what was actually persisted.
   useEffect(() => {
     let cancelled = false;
+    if (requestedFormat) setFormat(requestedFormat);
     getSettings()
       .then((s) => {
         if (cancelled) return;
         const fmt = s.defaultFormat;
-        if (fmt === 'pdf' || fmt === 'png' || fmt === 'jpeg' || fmt === 'webp') setFormat(fmt);
+        if (
+          !requestedFormat &&
+          (fmt === 'pdf' || fmt === 'png' || fmt === 'jpeg' || fmt === 'webp')
+        )
+          setFormat(fmt);
         setQuality(s.quality);
         setPdfPageSize(s.pdfPageSize);
         setPdfOrientation(s.pdfOrientation);
@@ -965,7 +998,7 @@ function ExportDialog({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [requestedFormat]);
 
   const isFull = pdfPageSize === 'full';
   const showQuality = format === 'jpeg' || format === 'webp';
@@ -1022,10 +1055,10 @@ function ExportDialog({
       }
       onSuccess();
       onClose();
-    } catch {
+    } catch (error) {
       // Keep the dialog open on failure — there is no other surface for this
       // error, and the fields (scale, format) are right here to adjust and retry.
-      setExportError(t('editorExportError'));
+      setExportError(editorExportErrorMessage(error));
     } finally {
       // ed.exporting only covers the export call itself, so it clears before the
       // settings write. This flag spans the whole operation, so the button

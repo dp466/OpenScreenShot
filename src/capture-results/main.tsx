@@ -4,22 +4,25 @@ import {
   deleteCaptureBundle,
   getCaptureBundle,
   readCapturePart,
+  setCaptureExportName,
   type CaptureBundle,
   type CapturePart,
 } from '../shared/capture-bundles';
 import { setLastCapture } from '../shared/storage';
 import { buildPdfSequential } from '../editor/pdf-writer';
-import { imageBlob, pdfPages, pdfSliceHeight } from './export';
-import { getUiLanguage } from '../shared/i18n';
+import { imageBlob, pdfPages, pdfSliceHeight, watermarkPng } from './export';
+import { getMessage, getUiLanguage } from '../shared/i18n';
 import { translateCaptureMessage } from '../shared/capture-message-i18n';
+import { ExportNameDialog } from '../shared/ExportNameDialog';
+import { suggestExportName, validateExportName } from '../shared/export-name';
 import './style.css';
 
 const language = getUiLanguage();
 const fr = language.startsWith('fr');
 const text = fr
   ? {
-      heading: 'Votre capture longue',
-      intro: 'La page est conservée en sections à sa résolution de capture.',
+      heading: 'Votre capture',
+      intro: 'La capture conserve sa résolution. Les pages longues sont divisées en sections.',
       local: 'Traitement et stockage locaux. Aucun téléversement ni synchronisation.',
       folder:
         'Choisissez un dossier qui ne se synchronise pas avec OneDrive, iCloud ou un autre service.',
@@ -48,8 +51,8 @@ const text = fr
       progress: (page: number, total: number) => `Préparation du PDF : page ${page} sur ${total}…`,
     }
   : {
-      heading: 'Your long capture',
-      intro: 'The page is saved in sections at its captured resolution.',
+      heading: 'Your capture',
+      intro: 'The capture keeps its original resolution. Long pages are saved in sections.',
       local: 'Processed and stored locally. No uploads or synchronization.',
       folder: 'Choose a folder that is not synchronized with OneDrive, iCloud, or another service.',
       retained: 'The three previous long captures are retained. Download files you want to keep.',
@@ -80,6 +83,7 @@ document.documentElement.lang = fr ? 'fr' : 'en';
 document.title = `OpenScreenShot — ${text.heading}`;
 
 function filename(bundle: CaptureBundle): string {
+  if (bundle.requestFilename) return validateExportName(bundle.exportName ?? '');
   const name = Array.from(bundle.title, (character) =>
     character.charCodeAt(0) < 32 ? '_' : character,
   )
@@ -88,6 +92,15 @@ function filename(bundle: CaptureBundle): string {
     .trim()
     .slice(0, 90);
   return name || (fr ? 'capture-ecran' : 'screenshot');
+}
+
+function hasConfirmedName(bundle: CaptureBundle): boolean {
+  try {
+    validateExportName(bundle.exportName ?? '');
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function saveBlob(blob: Blob, name: string): Promise<void> {
@@ -106,6 +119,8 @@ function App() {
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [deleted, setDeleted] = useState(false);
+  const [showNameDialog, setShowNameDialog] = useState(false);
+  const exportAllowed = !!bundle && (!bundle.requestFilename || hasConfirmedName(bundle));
 
   useEffect(() => {
     const id = new URLSearchParams(location.search).get('id');
@@ -114,7 +129,10 @@ function App() {
       return;
     }
     getCaptureBundle(id)
-      .then(setBundle)
+      .then((saved) => {
+        setBundle(saved);
+        setShowNameDialog(!!saved?.requestFilename && !hasConfirmedName(saved));
+      })
       .catch((err: unknown) => {
         setError(
           translateCaptureMessage(err instanceof Error ? err.message : String(err), language),
@@ -139,36 +157,46 @@ function App() {
   }
 
   async function savePart(part: CapturePart) {
-    if (!bundle) return;
+    if (!bundle || !exportAllowed) return;
     const data = await readCapturePart(bundle.id, part.index);
+    const base = filename(bundle);
     await saveBlob(
-      imageBlob(data),
-      `${filename(bundle)}_part-${String(part.index + 1).padStart(3, '0')}.png`,
+      bundle.requestFilename ? await watermarkPng(data, base) : imageBlob(data),
+      `${base}_part-${String(part.index + 1).padStart(3, '0')}.png`,
     );
     setStatus(text.saved);
   }
 
   async function savePdf() {
-    if (!bundle?.parts.length) return;
+    if (!bundle?.parts.length || !exportAllowed) return;
+    const base = filename(bundle);
     const count = Math.ceil(bundle.height / pdfSliceHeight(bundle.width));
     const blob = await buildPdfSequential(
-      pdfPages(bundle, (page, total) => setStatus(text.progress(page, total))),
+      pdfPages(
+        bundle,
+        (page, total) => setStatus(text.progress(page, total)),
+        bundle.requestFilename ? base : undefined,
+      ),
       count,
     );
-    await saveBlob(blob, `${filename(bundle)}.pdf`);
+    await saveBlob(blob, `${base}.pdf`);
     setStatus(text.saved);
   }
 
   async function openEditor(part: CapturePart) {
-    if (!bundle) return;
+    if (!bundle || !exportAllowed) return;
     await setLastCapture({
       dataUrl: await readCapturePart(bundle.id, part.index),
       width: part.width,
       height: part.height,
-      mode: 'full-page',
-      title: `${bundle.title} — ${text.part} ${part.index + 1}`,
+      mode: bundle.mode ?? 'full-page',
+      title:
+        bundle.parts.length === 1
+          ? bundle.title
+          : `${bundle.title} — ${text.part} ${part.index + 1}`,
       url: bundle.url,
       capturedAt: bundle.createdAt,
+      ...(bundle.requestFilename ? { exportName: filename(bundle), filenameWatermark: true } : {}),
     });
     await chrome.tabs.create({ url: chrome.runtime.getURL('src/editor/index.html') });
     setStatus('');
@@ -213,17 +241,29 @@ function App() {
                 </ul>
               )}
             </div>
+            {bundle.requestFilename && (
+              <div class="capture-export-name">
+                <div>
+                  <strong>{getMessage('exportNameLabel')}</strong>
+                  {bundle.exportName && <p class="capture-export-basename">{bundle.exportName}</p>}
+                  <p class="hint">{getMessage('exportNameHint')}</p>
+                </div>
+                <button disabled={busy} onClick={() => setShowNameDialog(true)}>
+                  {getMessage(bundle.exportName ? 'exportNameEdit' : 'exportNameTitle')}
+                </button>
+              </div>
+            )}
             <div class="actions">
               <button
                 class={bundle.output === 'pdf' ? 'primary' : ''}
-                disabled={busy || !bundle.parts.length}
+                disabled={busy || !bundle.parts.length || !exportAllowed}
                 onClick={() => void perform(savePdf)}
               >
                 {text.pdf}
               </button>
               <button
                 class={bundle.output === 'png' ? 'primary' : ''}
-                disabled={busy || !bundle.parts.length}
+                disabled={busy || !bundle.parts.length || !exportAllowed}
                 onClick={() =>
                   void perform(async () => {
                     for (const part of bundle.parts) await savePart(part);
@@ -258,10 +298,16 @@ function App() {
                   </p>
                 </div>
                 <div class="part-actions">
-                  <button disabled={busy} onClick={() => void perform(() => savePart(part))}>
+                  <button
+                    disabled={busy || !exportAllowed}
+                    onClick={() => void perform(() => savePart(part))}
+                  >
                     {text.pngOne}
                   </button>
-                  <button disabled={busy} onClick={() => void perform(() => openEditor(part))}>
+                  <button
+                    disabled={busy || !exportAllowed}
+                    onClick={() => void perform(() => openEditor(part))}
+                  >
                     {text.edit}
                   </button>
                 </div>
@@ -296,6 +342,21 @@ function App() {
         <div class="notice warning" role="alert">
           {error}
         </div>
+      )}
+      {bundle && showNameDialog && (
+        <ExportNameDialog
+          initialName={
+            bundle.exportName ??
+            suggestExportName(bundle.title, fr ? 'capture-ecran' : 'screenshot')
+          }
+          onCancel={() => setShowNameDialog(false)}
+          onConfirm={async (name) => {
+            const updated = await setCaptureExportName(bundle.id, name);
+            setBundle(updated);
+            setShowNameDialog(false);
+            setStatus(getMessage('exportNameSaved'));
+          }}
+        />
       )}
     </main>
   );

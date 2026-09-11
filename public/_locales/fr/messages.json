@@ -2484,5 +2484,50 @@
   },
   "settingsSaveFailed": {
     "message": "Impossible d’enregistrer ces paramètres. Veuillez réessayer."
+  },
+  "watermarkOptionLabel": {
+    "message": "Demander un nom de fichier et ajouter un filigrane à chaque page"
+  },
+  "watermarkOptionHint": {
+    "message": "Pour les prochaines captures, choisissez à la fin un nom à afficher en bas à droite de chaque page PDF et de chaque section PNG. Tout est traité localement."
+  },
+  "exportNameTitle": {
+    "message": "Nommer cette capture"
+  },
+  "exportNameLabel": {
+    "message": "Nom du fichier"
+  },
+  "exportNameHint": {
+    "message": "Choisissez un nom de 120 caractères maximum. Ce même nom, sans extension, apparaîtra en bas à droite de chaque page PDF et de chaque section PNG. Tout est traité localement."
+  },
+  "exportNameConfirm": {
+    "message": "Utiliser ce nom"
+  },
+  "exportNameCancel": {
+    "message": "Annuler"
+  },
+  "exportNameEdit": {
+    "message": "Modifier le nom du fichier"
+  },
+  "exportNameErrorEmpty": {
+    "message": "Saisissez un nom de fichier."
+  },
+  "exportNameErrorInvalid": {
+    "message": "Utilisez un nom sans / \\ : * ? \" < > |, caractères de contrôle ni sauts de ligne. Le nom ne peut pas se terminer par un point ou une espace avant l’extension."
+  },
+  "exportNameErrorTooLong": {
+    "message": "Utilisez 120 caractères maximum, sans compter l’extension."
+  },
+  "exportNameErrorReserved": {
+    "message": "Ce nom de fichier est réservé par Windows. Choisissez un autre nom."
+  },
+  "exportNameErrorUnknown": {
+    "message": "Impossible d’enregistrer le nom du fichier. Veuillez réessayer."
+  },
+  "exportNameSaved": {
+    "message": "Nom du fichier et filigrane enregistrés."
+  },
+  "exportNameWatermarkPreview": {
+    "message": "Aperçu du filigrane"
   }
 }

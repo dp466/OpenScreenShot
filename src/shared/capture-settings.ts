@@ -8,6 +8,8 @@ export interface FullPageCaptureSettings {
   imageWaitTimeoutMs: number;
   /** Preferred local export when a page needs several image sections. */
   longPageOutput: 'pdf' | 'png';
+  /** Ask after capture for one filename, also printed on every exported page. */
+  filenameWatermark: boolean;
 }
 
 export const SCROLL_DELAY_MIN_MS = 500;
@@ -20,6 +22,7 @@ export const DEFAULT_FULL_PAGE_SETTINGS: FullPageCaptureSettings = {
   waitForImages: true,
   imageWaitTimeoutMs: 10_000,
   longPageOutput: 'pdf',
+  filenameWatermark: false,
 };
 
 function milliseconds(value: unknown, fallback: number, min: number, max: number): number {
@@ -51,5 +54,9 @@ export function normalizeFullPageSettings(input: unknown): FullPageCaptureSettin
       IMAGE_WAIT_TIMEOUT_MAX_MS,
     ),
     longPageOutput: value.longPageOutput === 'png' ? 'png' : 'pdf',
+    filenameWatermark:
+      typeof value.filenameWatermark === 'boolean'
+        ? value.filenameWatermark
+        : DEFAULT_FULL_PAGE_SETTINGS.filenameWatermark,
   };
 }

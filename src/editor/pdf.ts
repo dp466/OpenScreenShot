@@ -58,6 +58,7 @@ export async function exportPdf(
   opts: PdfOptions,
   filename: string,
   onProgress?: (progress: PdfExportProgress) => void,
+  watermark?: string,
 ): Promise<void> {
   const imgW = canvas.width;
   const imgH = canvas.height;
@@ -70,6 +71,7 @@ export async function exportPdf(
       widthPt: pt(imgWmm),
       heightPt: pt(imgHmm),
       image: { canvas, xPt: 0, yPt: 0, wPt: pt(imgWmm), hPt: pt(imgHmm) },
+      ...(watermark === undefined ? {} : { watermark }),
     });
     await savePdf(pages, filename);
     return;
@@ -94,6 +96,7 @@ export async function exportPdf(
     pages.push({
       widthPt: pt(pageWmm),
       heightPt: pt(pageHmm),
+      ...(watermark === undefined ? {} : { watermark }),
       image: {
         canvas,
         xPt: pt((pageWmm - w) / 2),
@@ -120,6 +123,7 @@ export async function exportPdf(
     pages.push({
       widthPt: pt(pageWmm),
       heightPt: pt(pageHmm),
+      ...(watermark === undefined ? {} : { watermark }),
       image: {
         canvas: tile,
         xPt: pt(margin),

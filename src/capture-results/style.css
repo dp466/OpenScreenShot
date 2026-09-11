@@ -1,5 +1,13 @@
 @import '../shared/tokens.css';
 
+@font-face {
+  font-family: 'Roboto';
+  src: url('/fonts/roboto-variable.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -81,6 +89,25 @@ header p,
   flex-wrap: wrap;
   gap: 10px;
   margin: 22px 0 12px;
+}
+.capture-export-name {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-4);
+  margin-top: var(--s-5);
+  padding: var(--s-4);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.capture-export-name > div {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.capture-export-basename {
+  overflow-wrap: anywhere;
+  font-weight: 600;
 }
 button {
   background: var(--surface-1);

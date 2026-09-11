@@ -70,13 +70,16 @@ describe('long capture PDF export', () => {
     });
     const progress = vi.fn();
     const sizes: number[][] = [];
-    for await (const page of pdfPages(bundle, progress)) {
+    const labels: (string | undefined)[] = [];
+    for await (const page of pdfPages(bundle, progress, 'Équipe Québec')) {
       sizes.push([page.image.canvas.width, page.image.canvas.height]);
+      labels.push(page.watermark);
     }
     expect(sizes).toEqual([
       [4, 5],
       [4, 3],
     ]);
+    expect(labels).toEqual(['Équipe Québec', 'Équipe Québec']);
     expect(draws).toEqual([
       [0, 0, 4, 3, 0, 0, 4, 3],
       [0, 0, 4, 2, 0, 3, 4, 2],

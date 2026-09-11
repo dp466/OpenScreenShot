@@ -2484,5 +2484,50 @@
   },
   "settingsSaveFailed": {
     "message": "Could not save these settings. Please try again."
+  },
+  "watermarkOptionLabel": {
+    "message": "Ask for a filename and watermark each page"
+  },
+  "watermarkOptionHint": {
+    "message": "For new captures, choose a name at the end to display at the bottom right of every PDF page and PNG section. Everything is processed locally."
+  },
+  "exportNameTitle": {
+    "message": "Name this capture"
+  },
+  "exportNameLabel": {
+    "message": "Filename"
+  },
+  "exportNameHint": {
+    "message": "Choose a name of up to 120 characters. This same name, without the extension, will appear at the bottom right of every PDF page and PNG section. Everything is processed locally."
+  },
+  "exportNameConfirm": {
+    "message": "Use this name"
+  },
+  "exportNameCancel": {
+    "message": "Cancel"
+  },
+  "exportNameEdit": {
+    "message": "Change filename"
+  },
+  "exportNameErrorEmpty": {
+    "message": "Enter a filename."
+  },
+  "exportNameErrorInvalid": {
+    "message": "Use a name without / \\ : * ? \" < > |, control characters or line breaks. The name cannot end with a period or a space before the extension."
+  },
+  "exportNameErrorTooLong": {
+    "message": "Use no more than 120 characters, excluding the extension."
+  },
+  "exportNameErrorReserved": {
+    "message": "This filename is reserved by Windows. Choose another name."
+  },
+  "exportNameErrorUnknown": {
+    "message": "The filename could not be saved. Please try again."
+  },
+  "exportNameSaved": {
+    "message": "Filename and watermark saved."
+  },
+  "exportNameWatermarkPreview": {
+    "message": "Watermark preview"
   }
 }

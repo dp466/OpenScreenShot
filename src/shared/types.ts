@@ -102,6 +102,10 @@ export interface LastCapture {
   url?: string;
   capturedAt: number;
   id?: string;
+  /** Chosen export base, preserved verbatim when a named capture is reopened. */
+  exportName?: string;
+  /** Capture-time preference: later setting changes must not alter this capture. */
+  filenameWatermark?: boolean;
 }
 
 /**
@@ -121,6 +125,8 @@ export interface CaptureHistoryEntry {
   title: string;
   url?: string;
   capturedAt: number;
+  exportName?: string;
+  filenameWatermark?: boolean;
   /**
    * The full image's stored size, in bytes — `dataUrl.length` at write time
    * (the base64 string's UTF-16 length, close enough to its byte count to

@@ -160,6 +160,31 @@ describe('withCapture (byte budget — R-28a)', () => {
 });
 
 describe('setLastCapture (eviction, end to end)', () => {
+  it('preserves the chosen filename and capture-time watermark with the untouched full image', async () => {
+    const storage = await import('../../src/shared/storage');
+    const original = capture({ exportName: 'Rapport été.pdf', filenameWatermark: true });
+    await storage.setLastCapture(original);
+    const [entry] = await storage.listCaptureHistory();
+    expect(entry.exportName).toBe('Rapport été.pdf');
+    expect(entry.filenameWatermark).toBe(true);
+    expect(entry.imageBytes).toBe(original.dataUrl.length);
+    expect(await storage.openCapture(entry.id)).toMatchObject(original);
+    expect(await storage.getLastCapture()).toMatchObject(original);
+  });
+
+  it.each([undefined, false])(
+    'does not opt an unmarked capture into watermarking (%s)',
+    async (flag) => {
+      const storage = await import('../../src/shared/storage');
+      await storage.setLastCapture(capture({ filenameWatermark: flag }));
+      const [entry] = await storage.listCaptureHistory();
+      expect(entry.filenameWatermark).toBe(flag);
+      const reopened = await storage.openCapture(entry.id);
+      expect(reopened?.filenameWatermark).toBe(flag);
+      expect(reopened?.exportName).toBeUndefined();
+    },
+  );
+
   it('caps the shelf at CAPTURE_HISTORY_LIMIT and frees the evicted image keys', async () => {
     const storage = await import('../../src/shared/storage');
     for (let i = 0; i < storage.CAPTURE_HISTORY_LIMIT + 3; i++) {
@@ -261,6 +286,16 @@ describe('capture-store concurrency (R-28a Important #1)', () => {
 });
 
 describe('legacy capture migration', () => {
+  it('carries existing filename metadata through a legacy capture migration without stamping its pixels', async () => {
+    const storage = await import('../../src/shared/storage');
+    const original = capture({ exportName: 'État du projet.png', filenameWatermark: true });
+    await chrome.storage.local.set({ 'openscreenshot:last-capture': original });
+    const [entry] = await storage.listCaptureHistory();
+    expect(entry.exportName).toBe(original.exportName);
+    expect(entry.filenameWatermark).toBe(true);
+    expect(await storage.openCapture(entry.id)).toMatchObject(original);
+  });
+
   it('turns the old single-capture key into the newest shelf entry', async () => {
     const storage = await import('../../src/shared/storage');
     await chrome.storage.local.set({

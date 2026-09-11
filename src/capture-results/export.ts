@@ -1,5 +1,6 @@
 import { readCapturePart, type CaptureBundle } from '../shared/capture-bundles';
 import type { PdfPage } from '../editor/pdf-writer';
+import { drawWatermark, ensureWatermarkFont } from '../shared/watermark';
 
 /** Limit each PDF page canvas independently of the whole document's length. */
 export function pdfSliceHeight(width: number): number {
@@ -19,6 +20,36 @@ export function imageBlob(dataUrl: string): Blob {
   return new Blob([bytes], { type: 'image/png' });
 }
 
+/** Decode one local section and watermark an export copy at its original size. */
+export async function watermarkPng(dataUrl: string, text: string): Promise<Blob> {
+  const source = imageBlob(dataUrl);
+  if (!text.trim()) return source;
+  await ensureWatermarkFont(text);
+  const bitmap = await createImageBitmap(source);
+  let canvas: HTMLCanvasElement | undefined;
+  try {
+    canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas 2D context unavailable');
+    ctx.drawImage(bitmap, 0, 0);
+    drawWatermark(ctx, text, canvas.width, canvas.height);
+    return await new Promise<Blob>((resolve, reject) => {
+      canvas!.toBlob((blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error('Unable to encode the watermarked image.'));
+      }, 'image/png');
+    });
+  } finally {
+    bitmap.close();
+    if (canvas) {
+      canvas.width = 0;
+      canvas.height = 0;
+    }
+  }
+}
+
 /**
  * A PDF page can span section boundaries. Decode sections strictly in order,
  * closing each bitmap before loading the next. Only one section bitmap and
@@ -27,6 +58,7 @@ export function imageBlob(dataUrl: string): Blob {
 export async function* pdfPages(
   bundle: CaptureBundle,
   onProgress: (page: number, total: number) => void,
+  watermark?: string,
 ): AsyncGenerator<PdfPage> {
   const sliceHeight = pdfSliceHeight(bundle.width);
   const pageCount = Math.ceil(bundle.height / sliceHeight);
@@ -71,6 +103,7 @@ export async function* pdfPages(
       yield {
         widthPt: 210 * pt,
         heightPt: 297 * pt,
+        ...(watermark ? { watermark } : {}),
         image: {
           canvas,
           xPt: 8 * pt,

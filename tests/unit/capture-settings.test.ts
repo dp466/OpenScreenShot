@@ -19,6 +19,7 @@ describe('full-page capture preferences', () => {
       waitForImages: true,
       imageWaitTimeoutMs: 10000,
       longPageOutput: 'pdf',
+      filenameWatermark: false,
     });
     expect(normalizeFullPageSettings(DEFAULT_SETTINGS)).toEqual(DEFAULT_FULL_PAGE_SETTINGS);
   });
@@ -29,6 +30,7 @@ describe('full-page capture preferences', () => {
       waitForImages: false,
       imageWaitTimeoutMs: 18000,
       longPageOutput: 'png' as const,
+      filenameWatermark: true,
     };
     expect(normalizeFullPageSettings(chosen)).toEqual(chosen);
     expect(normalizeFullPageSettings(normalizeFullPageSettings(chosen))).toEqual(chosen);
@@ -68,6 +70,31 @@ describe('full-page capture preferences', () => {
     expect(normalizeFullPageSettings({ waitForImages: 'false', longPageOutput: 'cloud' })).toEqual(
       DEFAULT_FULL_PAGE_SETTINGS,
     );
+  });
+
+  it.each(['true', 'false', 1, 0, null, undefined, [], {}])(
+    'keeps filename watermarking opt-in when its stored value is malformed (%s)',
+    (filenameWatermark) => {
+      expect(normalizeFullPageSettings({ filenameWatermark }).filenameWatermark).toBe(false);
+    },
+  );
+
+  it('persists the optional filename watermark alongside existing preferences', async () => {
+    const write = vi.fn(async () => {});
+    vi.stubGlobal('chrome', {
+      storage: {
+        local: {
+          get: vi.fn(async (key: string) => ({ [key]: { captureDelay: 5 } })),
+          set: write,
+        },
+      },
+    });
+    const enabled = await setSettings({ filenameWatermark: true });
+    expect(enabled).toMatchObject({ filenameWatermark: true, captureDelay: 5 });
+    expect(write).toHaveBeenLastCalledWith({ 'openscreenshot:settings': enabled });
+    const disabled = await setSettings({ filenameWatermark: false });
+    expect(disabled.filenameWatermark).toBe(false);
+    expect(write).toHaveBeenLastCalledWith({ 'openscreenshot:settings': disabled });
   });
 
   it('rounds fractional milliseconds and does not modify the stored input', () => {

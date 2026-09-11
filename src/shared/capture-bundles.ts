@@ -1,4 +1,6 @@
 import { makeThumbnail } from './thumbnail';
+import { validateExportName } from './export-name';
+import type { CaptureMode } from './types';
 
 /** A long capture is persisted as bounded image sections, never one giant canvas. */
 export interface CapturePart {
@@ -14,12 +16,18 @@ export interface CaptureBundle {
   title: string;
   url: string;
   output: 'pdf' | 'png';
+  /** Earlier bundles were exclusively full-page captures. */
+  mode?: CaptureMode;
   width: number;
   height: number;
   parts: CapturePart[];
   warnings: string[];
   incomplete: boolean;
   createdAt: number;
+  /** Snapshot of the naming option when this capture started. */
+  requestFilename?: boolean;
+  /** Confirmed basename; raw capture parts remain unchanged when it is edited. */
+  exportName?: string;
 }
 
 interface StoredBundle extends CaptureBundle {
@@ -73,6 +81,8 @@ export async function createCaptureBundle(input: {
   title: string;
   url: string;
   output: 'pdf' | 'png';
+  mode?: CaptureMode;
+  requestFilename?: boolean;
 }): Promise<CaptureBundle> {
   return locked(async () => {
     const ids = await readIndex();
@@ -197,6 +207,18 @@ export async function finishCaptureBundle(
 
 export async function getCaptureBundle(id: string): Promise<CaptureBundle | null> {
   return readMetadata(id);
+}
+
+/** Rename metadata only, sharing the lock used by capture appends and completion. */
+export async function setCaptureExportName(id: string, name: string): Promise<CaptureBundle> {
+  const exportName = validateExportName(name);
+  return locked(async () => {
+    const bundle = await readMetadata(id);
+    if (!bundle) throw new Error('The local capture is no longer available.');
+    const updated: StoredBundle = { ...bundle, exportName };
+    await chrome.storage.local.set({ [metadataKey(id)]: updated });
+    return updated;
+  });
 }
 
 /** Metadata and small thumbnails only; used to reopen a closed results tab. */

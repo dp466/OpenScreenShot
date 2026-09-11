@@ -1,0 +1,100 @@
+.export-name-dialog {
+  box-sizing: border-box;
+  width: min(520px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  padding: var(--s-5);
+  overflow: auto;
+  background: var(--surface-1);
+  color: var(--text-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-lg);
+  font: var(--fs-base) / 1.55 var(--font);
+}
+.export-name-dialog::backdrop {
+  background: color-mix(in srgb, var(--text-1) 45%, transparent);
+}
+.export-name-dialog h2 {
+  margin: 0 0 var(--s-3);
+  font-size: var(--fs-xl);
+  line-height: 1.3;
+}
+.export-name-dialog .export-name-hint {
+  margin: 0 0 var(--s-5);
+  color: var(--text-2);
+}
+.export-name-dialog label {
+  display: block;
+  margin-bottom: var(--s-2);
+  font-weight: 600;
+}
+.export-name-dialog input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: var(--s-3);
+  background: var(--surface-1);
+  color: var(--text-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font: inherit;
+}
+.export-name-dialog input[aria-invalid='true'] {
+  border-color: var(--danger-ink);
+}
+.export-name-dialog .export-name-preview {
+  margin: var(--s-4) 0;
+  padding: var(--s-3);
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+  overflow-wrap: anywhere;
+}
+.export-name-preview span {
+  display: block;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.export-name-preview strong {
+  display: block;
+  text-align: right;
+}
+.export-name-dialog .export-name-error {
+  margin: var(--s-3) 0;
+  color: var(--danger-ink);
+}
+.export-name-dialog .export-name-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin-top: var(--s-5);
+}
+.export-name-dialog button {
+  min-height: 44px;
+  padding: var(--s-2) var(--s-4);
+  background: var(--surface-1);
+  color: var(--text-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font: 600 var(--fs-base) / 1.4 var(--font);
+  cursor: pointer;
+}
+.export-name-dialog button:hover:not(:disabled) {
+  background: var(--surface-3);
+}
+.export-name-dialog .export-name-confirm {
+  background: var(--accent-ink);
+  color: var(--on-accent);
+  border-color: var(--accent-ink);
+}
+.export-name-dialog .export-name-confirm:hover:not(:disabled) {
+  background: var(--accent-ink-hover);
+}
+.export-name-dialog :is(input, button):focus-visible {
+  outline: 3px solid var(--border-focus);
+  outline-offset: 3px;
+}
+.export-name-dialog :disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
