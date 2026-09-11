@@ -11,6 +11,8 @@ import {
 import { DEFAULT_RECORDING_SETTINGS } from '../../src/shared/recording-types';
 import { REC_FAILURE_KEY, REC_FAILURE_MESSAGE, isRecFailure } from '../../src/shared/rec-failure';
 import { theme as designTheme } from '../../src/shared/design-tokens';
+import english from '../../public/_locales/en/messages.json';
+import french from '../../public/_locales/fr/messages.json';
 
 /**
  * The worker half of "surface every failure", driven through the listener
@@ -182,7 +184,7 @@ function liveState(sessionId = 'sess-1', segmentId = 'seg-1', overlayMounted = t
  * What the worker injected into the page, in order. The three injections are
  * told apart by their arguments, which is how they differ in production too:
  * the viewport read passes an empty array, the control-bar mount passes
- * seven, and the unmount passes none at all.
+ * eight (including translated labels), and the unmount passes none at all.
  */
 function injections(): string[] {
   const calls = fakeChrome.scripting.executeScript.mock.calls as [{ args?: unknown[] }][];
@@ -1579,4 +1581,49 @@ describe('recording state written before this build', () => {
       .filter((args): args is unknown[] => (args?.length ?? 0) > 1);
     expect(mounts.at(-1)?.[6]).toBe(true);
   });
+});
+
+describe('recording overlay language preference', () => {
+  it.each(['fr', 'en'] as const)(
+    'waits for saved %s settings before injecting localized controls',
+    async (language) => {
+      workingTab();
+      liveOffscreen();
+      session.set(REC_STATE_KEY, liveState());
+      let release!: (value: unknown) => void;
+      const readSettings = vi.fn(
+        () =>
+          new Promise((resolve) => {
+            release = resolve;
+          }),
+      );
+      vi.stubGlobal('chrome', {
+        ...fakeChrome,
+        storage: { ...fakeChrome.storage, local: { get: readSettings } },
+        i18n: {
+          getUILanguage: () => (language === 'fr' ? 'en-US' : 'fr-FR'),
+          getMessage: () => 'Browser language',
+        },
+      });
+      await loadWorker();
+      await send({ type: 'REC_QUERY' });
+      await settle();
+      expect(readSettings).toHaveBeenCalledWith('openscreenshot:settings');
+      expect(injections()).not.toContain('mount');
+
+      release({ 'openscreenshot:settings': { language } });
+      await settle();
+      const calls = fakeChrome.scripting.executeScript.mock.calls as [{ args?: unknown[] }][];
+      const args = calls.map(([call]) => call.args).find((args) => (args?.length ?? 0) > 1);
+      const messages = language === 'fr' ? french : english;
+      expect(args?.[7]).toMatchObject({
+        recOverlayStop: messages.recOverlayStop.message,
+        recOverlayPause: messages.recOverlayPause.message,
+        recOverlayReveal: messages.recOverlayReveal.message,
+        recWebcamDenied: messages.recWebcamDenied.message,
+      });
+      expect(offscreenSends()).not.toContain('OFFSCREEN_START');
+      expect(offscreenSends()).not.toContain('OFFSCREEN_STOP');
+    },
+  );
 });

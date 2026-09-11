@@ -10,9 +10,12 @@ import {
 import { setLastCapture } from '../shared/storage';
 import { buildPdfSequential } from '../editor/pdf-writer';
 import { imageBlob, pdfPages, pdfSliceHeight } from './export';
+import { getUiLanguage } from '../shared/i18n';
+import { translateCaptureMessage } from '../shared/capture-message-i18n';
 import './style.css';
 
-const fr = (chrome.i18n?.getUILanguage?.() || navigator.language).startsWith('fr');
+const language = getUiLanguage();
+const fr = language.startsWith('fr');
 const text = fr
   ? {
       heading: 'Votre capture longue',
@@ -41,6 +44,7 @@ const text = fr
       edit: 'Ouvrir dans l’éditeur',
       pngOne: 'Enregistrer le PNG',
       wait: 'Veuillez patienter…',
+      screenshot: 'Capture d’écran',
       progress: (page: number, total: number) => `Préparation du PDF : page ${page} sur ${total}…`,
     }
   : {
@@ -68,6 +72,7 @@ const text = fr
       edit: 'Open in editor',
       pngOne: 'Save PNG',
       wait: 'Please wait…',
+      screenshot: 'Screenshot',
       progress: (page: number, total: number) => `Preparing PDF: page ${page} of ${total}…`,
     };
 
@@ -82,7 +87,7 @@ function filename(bundle: CaptureBundle): string {
     .replace(/[\\/:*?"<>|]/g, '_')
     .trim()
     .slice(0, 90);
-  return name || 'screenshot';
+  return name || (fr ? 'capture-ecran' : 'screenshot');
 }
 
 async function saveBlob(blob: Blob, name: string): Promise<void> {
@@ -111,7 +116,9 @@ function App() {
     getCaptureBundle(id)
       .then(setBundle)
       .catch((err: unknown) => {
-        setError(err instanceof Error ? err.message : String(err));
+        setError(
+          translateCaptureMessage(err instanceof Error ? err.message : String(err), language),
+        );
       })
       .finally(() => setLoading(false));
   }, []);
@@ -125,7 +132,7 @@ function App() {
       await action();
     } catch (err) {
       setStatus('');
-      setError(err instanceof Error ? err.message : String(err));
+      setError(translateCaptureMessage(err instanceof Error ? err.message : String(err), language));
     } finally {
       setBusy(false);
     }
@@ -183,10 +190,11 @@ function App() {
       ) : (
         <>
           <section class="summary" aria-label={text.heading}>
-            <h2>{bundle.title || 'Screenshot'}</h2>
+            <h2>{bundle.title || text.screenshot}</h2>
             <p class="dimensions">
-              {bundle.width.toLocaleString()} × {bundle.height.toLocaleString()} px ·{' '}
-              {bundle.parts.length} {text.sections}
+              {bundle.width.toLocaleString(getUiLanguage())} ×{' '}
+              {bundle.height.toLocaleString(getUiLanguage())} px · {bundle.parts.length}{' '}
+              {text.sections}
             </p>
             <p class="source">{bundle.url}</p>
             <div class={bundle.incomplete || bundle.warnings.length ? 'notice warning' : 'notice'}>
@@ -200,7 +208,7 @@ function App() {
               {bundle.warnings.length > 0 && (
                 <ul>
                   {bundle.warnings.map((warning) => (
-                    <li key={warning}>{warning}</li>
+                    <li key={warning}>{translateCaptureMessage(warning, language)}</li>
                   ))}
                 </ul>
               )}
@@ -241,10 +249,12 @@ function App() {
                     {text.part} {part.index + 1}
                   </h2>
                   <p>
-                    {part.width.toLocaleString()} × {part.height.toLocaleString()} px
+                    {part.width.toLocaleString(getUiLanguage())} ×{' '}
+                    {part.height.toLocaleString(getUiLanguage())} px
                   </p>
                   <p class="hint">
-                    {part.y.toLocaleString()}–{(part.y + part.height).toLocaleString()} px
+                    {part.y.toLocaleString(getUiLanguage())}–
+                    {(part.y + part.height).toLocaleString(getUiLanguage())} px
                   </p>
                 </div>
                 <div class="part-actions">

@@ -8,15 +8,11 @@
  * track box and the ms-per-pixel scale once, on pointerdown, so the geometry
  * stays stable while the rows reflow underneath.
  */
+import { getMessage as t } from '../shared/i18n';
 import { useRef } from 'preact/hooks';
 import { formatTimer } from '../content/recording-overlay';
 import { clampCenter, EASE_MS, ZOOM_SCALES, type ZoomBlock, type ZoomScale } from './zoom';
 import { visibleDuration, type SegmentTiming } from './timeline-math';
-
-// i18n helper (one per surface, like the popup and the editor)
-function t(id: string): string {
-  return chrome.i18n.getMessage(id) ?? id;
-}
 
 /** Shortest block that still has room for both eases. */
 const MIN_BLOCK_MS = 2 * EASE_MS;

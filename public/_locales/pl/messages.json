@@ -140,5 +140,53 @@
   "errUnknown": {
     "message": "Przechwytywanie nieoczekiwanie się nie powiodło.",
     "description": "Capture error: unexpected failure."
+  },
+  "settingsLanguage": {
+    "message": "Interface language"
+  },
+  "languageFrench": {
+    "message": "Français"
+  },
+  "languageEnglish": {
+    "message": "English"
+  },
+  "languageBrowser": {
+    "message": "Browser language"
+  },
+  "settingsLanguageHint": {
+    "message": "Applies to extension menus. Reopen other extension tabs to update their language."
+  },
+  "commandCaptureFullPage": {
+    "message": "Capture the full scrolling page"
+  },
+  "commandCaptureVisible": {
+    "message": "Capture the visible area"
+  },
+  "commandCaptureRegion": {
+    "message": "Capture a selected region"
+  },
+  "commandStopRecording": {
+    "message": "Stop the current recording"
+  },
+  "commandRevealRecordingBar": {
+    "message": "Show the recording control bar"
+  },
+  "editorPageTitle": {
+    "message": "Screenshot editor — OpenScreenShot Local"
+  },
+  "recorderPageTitle": {
+    "message": "Recordings — OpenScreenShot Local"
+  },
+  "setupPageTitle": {
+    "message": "Recording setup — OpenScreenShot Local"
+  },
+  "captureResultsPageTitle": {
+    "message": "Long captures — OpenScreenShot Local"
+  },
+  "regionCaptureAction": {
+    "message": "Capture"
+  },
+  "settingsSaveFailed": {
+    "message": "Could not save these settings. Please try again."
   }
 }

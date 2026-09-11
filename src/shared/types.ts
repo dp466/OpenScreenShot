@@ -148,10 +148,13 @@ export type CaptureAction = 'editor' | 'clipboard' | 'download';
 
 export type ExportFormat = 'png' | 'jpeg' | 'webp' | 'pdf';
 export type ThemePreference = 'light' | 'dark' | 'system';
+export type UiLanguagePreference = 'auto' | 'fr' | 'en';
 
 export interface Settings extends FullPageCaptureSettings {
   defaultFormat: ExportFormat;
   theme: ThemePreference;
+  /** Interface language, independent of the browser's language. */
+  language: UiLanguagePreference;
   // PDF defaults (used from M3 onward; stored now so settings are stable)
   pdfPageSize: 'a4' | 'letter' | 'full';
   pdfOrientation: 'portrait' | 'landscape';
@@ -185,6 +188,7 @@ export const DEFAULT_SETTINGS: Settings = {
   ...DEFAULT_FULL_PAGE_SETTINGS,
   defaultFormat: 'png',
   theme: 'system',
+  language: 'fr',
   pdfPageSize: 'a4',
   pdfOrientation: 'portrait',
   pdfMultiPage: true,

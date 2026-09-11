@@ -45,6 +45,7 @@
  * latest unwritten snapshot so `flushPending` can write it synchronously
  * from the load effect's cleanup or the `visibilitychange` handler.
  */
+import { getMessage as t } from '../shared/i18n';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { loadSession } from './session-load';
 import type { LoadedSegment, LoadProgress } from './session-load';
@@ -79,11 +80,6 @@ import { clampTrim, locate, timelineAt, totalDuration, type SegmentTiming } from
 
 /** The editor's live state is exactly one undo step's worth of it. */
 export type EditorState = RecorderEdit;
-
-/** i18n helper (one per surface, like the rail and the timeline). */
-function t(id: string, subs?: string[]): string {
-  return chrome.i18n.getMessage(id, subs) ?? id;
-}
 
 /** "1 zoom block" / "4 zoom blocks" — what a zoom step's announcement counts. */
 function zoomBlockCount(total: number): string {

@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { deleteCapture, listCaptureHistory } from '../shared/storage';
+import { getUiLanguage } from '../shared/i18n';
 import type { CaptureHistoryEntry } from '../shared/types';
 import { arrowNav, getFocusable, syncRovingTabIndex, trapFocus } from './focus';
 import { labelForSource } from './capture-label';
@@ -7,7 +8,7 @@ import { t } from './i18n';
 
 /** The date string shared by a row's own label and its Open/Delete names. */
 function capturedLabel(entry: CaptureHistoryEntry): string {
-  return new Date(entry.capturedAt).toLocaleString();
+  return new Date(entry.capturedAt).toLocaleString(getUiLanguage());
 }
 
 /**

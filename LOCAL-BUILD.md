@@ -1,9 +1,26 @@
-# OpenScreenShot Local 2.1.1
+# OpenScreenShot Local 2.1.2 — Français / English
 
 Custom, unofficial build based on OpenScreenShot commit
 `16ed3c5f15f93ed15dff639cc2ee7908797df101` (upstream version 2.1.0).
 Upstream source: https://github.com/pghqdev/OpenScreenShot
 The MIT license and upstream attribution are retained.
+
+## Mise à jour depuis la version 2.1.1
+
+1. Extrayez le nouveau ZIP.
+2. Remplacez le contenu du dossier **extension déjà chargé dans Chrome** par le contenu du nouveau dossier **extension**, en conservant le même emplacement.
+3. Dans `chrome://extensions` (ou `edge://extensions`), cliquez sur **Actualiser / Recharger** sur la carte OpenScreenShot Local. Ne désinstallez pas l’extension : conserver son dossier et son identité conserve ses captures et réglages locaux.
+4. Le français est sélectionné par défaut. Le menu contextuel de l’icône donne accès à **Paramètres → Apparence → Langue de l’interface**. Vous pouvez choisir **Français**, **English** ou **Langue du navigateur**.
+
+La préférence est enregistrée uniquement dans le stockage local de l’extension. Un changement explicite recharge seulement la page des paramètres. Les pages de capture ou d’édition déjà ouvertes conservent leur travail; la nouvelle langue s’applique à leur prochaine ouverture. Les écrans appartenant à Chrome, comme la gestion des raccourcis et les dialogues d’enregistrement, gardent la langue de Chrome ou du système.
+
+Cette mise à jour traduit les menus, boutons de capture de zone, écrans de résultats, avertissements connus, éditeur et commandes d’enregistrement. Les titres des pages capturées et le contenu des captures ne sont pas traduits. Les messages techniques inconnus fournis par le navigateur restent intacts.
+
+## Upgrade from 2.1.1
+
+Replace the contents of the **existing loaded extension folder** with the new `extension` folder contents, keeping the same folder path. Click **Reload** on its `chrome://extensions` card. Do not uninstall it or load it from a new location if you want to retain its existing local captures and settings.
+
+French is the default. Use **Settings → Appearance → Interface language** to choose French, English, or the browser language. The selected language is stored locally. Existing editor/result tabs retain their current work and use the new language on their next opening. Native browser screens and save dialogs follow Chrome/the operating system.
 
 ## Install the ready-to-use extension
 
@@ -37,7 +54,7 @@ HTML images are checked for loading and decode readiness. CSS background images,
 
 ## Privacy and deletion
 
-The new screenshot path uses local browser APIs, `chrome.storage.local`, local PNG data, and local blob downloads. It adds no upload service, remote processing, telemetry, or browser synchronization. Installation does not open the vendor welcome page, and the vendor uninstall destination is cleared. Fonts and runtime scripts are bundled locally.
+The new screenshot path uses local browser APIs, `chrome.storage.local`, local PNG data, and local blob downloads. It adds no upload service, remote processing, telemetry, or browser synchronization. Installation does not open the vendor welcome page, and the vendor uninstall destination is cleared. Fonts and runtime scripts are bundled locally. The upstream OpenScreenShot MIT licence, Preact MIT licence, Roboto OFL licence and Material Icons Apache licence are included inside `extension/licenses/`.
 
 The visited website still makes its ordinary requests to load its content. Existing user-initiated upstream support, source, review, and donation links remain external links. The extension does not control operating-system backups or synchronization of the browser profile or downloaded files. Source URLs and page titles are retained alongside local captures.
 
@@ -68,4 +85,4 @@ Relevant implementation files:
 
 The automated suite covers normal and clipped scrollers, image loading/decode waits, timeout and cancellation behavior, exact restoration, section boundaries, tab switching and closure, storage errors, PDF pagination, localization, and accessibility guards. A 180,125px page at normal scale is checked for continuous coverage across 12 sections. Integration tests also check an exact 117,812px page without zooming out.
 
-The final delivery passes 1,378 automated tests across 71 test files, TypeScript checking, ESLint, changed-file formatting, and the production build. Browser preview navigation to the local test fixtures was rejected with `net::ERR_BLOCKED_BY_CLIENT` and a browser URL-policy denial. No live browser/installed-extension or site-specific visual test is claimed. The browser's installation flow, rendered settings/results, real download dialogs, and your particular website still need a local trial. Begin with a non-sensitive sample page and inspect the last section and image-heavy areas before relying on the result.
+This release is validated with the full automated suite, TypeScript, ESLint, formatting of changed files, and the production build. See BUILD-INFO.json in the delivered package for the exact test count. New tests check French menus on an English browser, language persistence, translated region/recording controls, and message substitutions without altering user content. Browser preview navigation to the local test fixtures was rejected with `net::ERR_BLOCKED_BY_CLIENT` and a browser URL-policy denial. No live browser/installed-extension or site-specific visual test is claimed. The browser's installation flow, rendered settings/results, real download dialogs, and your particular website still need a local trial. Begin with a non-sensitive sample page and inspect the last section and image-heavy areas before relying on the result.

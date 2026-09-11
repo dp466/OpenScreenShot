@@ -63,10 +63,11 @@ import {
 } from '../shared/rec-failure';
 import { applyTheme, watchSystemTheme } from '../shared/theme';
 import { RecentLongCaptures } from '../capture-results/RecentLongCaptures';
+import { getMessage } from '../shared/i18n';
 
 // i18n helper
 function t(id: string): string {
-  return chrome.i18n.getMessage(id) ?? id;
+  return getMessage(id);
 }
 
 // chrome:// URLs can't be opened via <a href>; tabs.create works from the popup.
@@ -432,9 +433,17 @@ export function App() {
   }
 
   async function updateSettings(patch: Partial<Settings>) {
-    const next = await setSettings(patch);
-    setSettingsState(next);
-    if (patch.theme) applyTheme(next.theme);
+    const languageChanged = patch.language !== undefined && patch.language !== settings.language;
+    try {
+      const next = await setSettings(patch);
+      setSettingsState(next);
+      if (patch.theme) applyTheme(next.theme);
+      // Only an explicit preference change reloads this settings page. Other
+      // extension pages keep their in-progress edits and use the choice on reopen.
+      if (languageChanged) location.reload();
+    } catch {
+      pushToast(t('settingsSaveFailed'), 'error');
+    }
   }
 
   function capture(mode: CaptureMode, repeat = false) {
@@ -704,11 +713,7 @@ export function App() {
                   class="mode-card"
                   data-busy={isBusy ? 'true' : undefined}
                   disabled={!!busy}
-                  title={
-                    keys.osShortcut
-                      ? chrome.i18n.getMessage('popupDigitHint', keys.digit)
-                      : undefined
-                  }
+                  title={keys.osShortcut ? getMessage('popupDigitHint', keys.digit) : undefined}
                   onClick={() => capture(m.id)}
                 >
                   <span class="mode-icon" aria-hidden="true">
@@ -838,10 +843,7 @@ export function App() {
             ? null
             : popupWarnings(recSettings, deviceStates).map((device) => (
                 <button key={device} class="perm-chip" onClick={() => goSetup()}>
-                  {chrome.i18n.getMessage(
-                    'popupPermissionChip',
-                    t(device === 'mic' ? 'recMic' : 'recWebcam'),
-                  )}
+                  {getMessage('popupPermissionChip', t(device === 'mic' ? 'recMic' : 'recWebcam'))}
                 </button>
               ))}
 
@@ -960,6 +962,31 @@ function SettingsView({
     <main class="settings" aria-label={t('settingsTitle')}>
       <section class="settings-group" aria-labelledby="settings-appearance">
         <h2 id="settings-appearance">{t('settingsAppearance')}</h2>
+        <div class="settings-row">
+          <label class="settings-label" for="interface-language">
+            {t('settingsLanguage')}
+          </label>
+          <div class="settings-control">
+            <select
+              id="interface-language"
+              class="text-input"
+              value={settings.language}
+              aria-describedby="interface-language-hint"
+              onChange={(e) =>
+                onChange({
+                  language: e.currentTarget.value as Settings['language'],
+                })
+              }
+            >
+              <option value="fr">{t('languageFrench')}</option>
+              <option value="en">{t('languageEnglish')}</option>
+              <option value="auto">{t('languageBrowser')}</option>
+            </select>
+            <p class="settings-hint" id="interface-language-hint">
+              {t('settingsLanguageHint')}
+            </p>
+          </div>
+        </div>
         <div class="settings-row">
           <span class="settings-label" id="theme-label">
             {t('settingsTheme')}

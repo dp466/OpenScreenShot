@@ -26,6 +26,7 @@
  * started with, so an edit now would only make the preview lie about what
  * the file will contain.
  */
+import { getMessage as t } from '../shared/i18n';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { BACKGROUND_PRESETS, type FrameOptions } from '../editor/frame';
 import { getFocusable } from '../editor/focus';
@@ -64,10 +65,6 @@ const CURSOR_MODES: readonly { mode: CursorMode; labelKey: string }[] = [
   { mode: 'rippleOnly', labelKey: 'recorderCursorRippleOnly' },
   { mode: 'ripple', labelKey: 'recorderCursorRipple' },
 ];
-
-function t(id: string, subs?: string[]): string {
-  return chrome.i18n.getMessage(id, subs) ?? id;
-}
 
 export interface RailProps {
   loaded: LoadedSession;

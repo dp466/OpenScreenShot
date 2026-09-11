@@ -12,7 +12,9 @@
  */
 import type { PageRect } from '../shared/types';
 
-export function selectRegion(): Promise<PageRect | null> {
+export function selectRegion(
+  labels: { capture: string; cancel: string } = { capture: 'Capture', cancel: 'Cancel' },
+): Promise<PageRect | null> {
   return new Promise((resolve) => {
     const doc = document;
     const VW = window.innerWidth;
@@ -83,7 +85,7 @@ export function selectRegion(): Promise<PageRect | null> {
       'box-shadow:0 4px 16px rgba(0,0,0,0.35);' +
       'font:500 12px/1 Roboto,Arial,sans-serif;';
     const captureBtn = doc.createElement('button');
-    captureBtn.textContent = 'Capture';
+    captureBtn.textContent = labels.capture;
     // The bar's own background is a fixed near-black regardless of the
     // extension's theme, so this hardcodes the dark theme's --accent-ink
     // (#a8c7fa) / --on-accent (#062e6f) pairing from src/shared/tokens.css —
@@ -92,7 +94,7 @@ export function selectRegion(): Promise<PageRect | null> {
       'border:none;border-radius:18px;padding:8px 16px;background:#a8c7fa;color:#062e6f;' +
       'font:inherit;cursor:pointer;';
     const cancelBtn = doc.createElement('button');
-    cancelBtn.textContent = 'Cancel';
+    cancelBtn.textContent = labels.cancel;
     cancelBtn.style.cssText =
       'border:none;border-radius:18px;padding:8px 12px;background:transparent;color:#cfcfcf;' +
       'font:inherit;cursor:pointer;';

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "OpenScreenShot Local",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "description": "__MSG_extDesc__",
   "default_locale": "en",
   "minimum_chrome_version": "116",
@@ -51,31 +51,31 @@
         "default": "Ctrl+Shift+S",
         "mac": "Command+Shift+S"
       },
-      "description": "Capture the full scrolling page"
+      "description": "__MSG_commandCaptureFullPage__"
     },
     "capture-visible": {
       "suggested_key": {
         "default": "Alt+Shift+V",
         "mac": "Command+Shift+V"
       },
-      "description": "Capture the visible area"
+      "description": "__MSG_commandCaptureVisible__"
     },
     "capture-region": {
       "suggested_key": {
         "default": "Ctrl+Shift+E",
         "mac": "Command+Shift+E"
       },
-      "description": "Capture a selected region"
+      "description": "__MSG_commandCaptureRegion__"
     },
     "stop-recording": {
       "suggested_key": {
         "default": "Alt+Shift+X",
         "mac": "Alt+Shift+X"
       },
-      "description": "Stop the current recording"
+      "description": "__MSG_commandStopRecording__"
     },
     "reveal-recording-bar": {
-      "description": "Show the recording control bar"
+      "description": "__MSG_commandRevealRecordingBar__"
     }
   }
 }

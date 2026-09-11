@@ -10,6 +10,7 @@
  * same origin the webcam bubble iframe and the offscreen engine use: a grant
  * here is a grant for recording.
  */
+import { getMessage as t } from '../shared/i18n';
 import { useEffect, useState } from 'preact/hooks';
 import { BrandMark } from '../shared/BrandMark';
 import {
@@ -32,10 +33,6 @@ import {
   type MediaBlock,
   type PermissionSnapshot,
 } from '../shared/permissions';
-
-function t(id: string): string {
-  return chrome.i18n.getMessage(id) || id;
-}
 
 const EMPTY: PermissionSnapshot = {
   tabCapture: false,

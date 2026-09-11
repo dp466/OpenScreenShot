@@ -106,6 +106,7 @@ let stitchedHeights: number[];
 let pageHeight: number;
 let closeOnSecondScroll: boolean;
 let pageUnavailable: boolean;
+let regionLabels: unknown;
 function makeChrome() {
   const noop = vi.fn(async () => undefined);
   return {
@@ -203,7 +204,10 @@ function makeChrome() {
             cancelled: false,
           };
         }
-        if (name === 'selectRegion') result = { x: 20, y: 20, width: 100, height: 100 };
+        if (name === 'selectRegion') {
+          regionLabels = args[0];
+          result = { x: 20, y: 20, width: 100, height: 100 };
+        }
         if (name === 'cropTile') result = 'data:image/png;base64,finished';
         return [{ result }];
       },
@@ -381,6 +385,11 @@ describe('screenshot capture overlay lifecycle', () => {
     await capture();
     expect(captures).toBe(0);
     expect(events.at(-1)).toBe('overlay:remove');
+  });
+
+  it('passes French region labels into the self-contained injected selector', async () => {
+    await capture('region');
+    expect(regionLabels).toEqual({ capture: 'Capturer', cancel: 'Annuler' });
   });
 
   it.each(['visible', 'region'])(

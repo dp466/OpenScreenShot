@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'preact/hooks';
 import { listCaptureBundles, type CaptureBundle } from '../shared/capture-bundles';
+import { getUiLanguage } from '../shared/i18n';
+import { translateCaptureMessage } from '../shared/capture-message-i18n';
 
 /** A closed results tab can always be reopened from the capture picker. */
 export function RecentLongCaptures() {
   const [bundles, setBundles] = useState<CaptureBundle[]>([]);
   const [error, setError] = useState('');
-  const fr = (chrome.i18n.getUILanguage?.() || navigator.language).startsWith('fr');
+  const language = getUiLanguage();
+  const fr = language.startsWith('fr');
   useEffect(() => {
     let mounted = true;
     const refresh = () =>
@@ -46,7 +49,7 @@ export function RecentLongCaptures() {
               })
               .then(() => window.close())
               .catch(() =>
-                setError(fr ? 'Impossible d’ouvrir la capture.' : 'Could not open this capture.'),
+                setError(translateCaptureMessage('Could not open this capture.', language)),
               );
           }}
         >
@@ -55,8 +58,7 @@ export function RecentLongCaptures() {
               {bundle.title || (fr ? 'Capture longue' : 'Long capture')}
             </span>
             <span class="mode-sub">
-              {bundle.parts.length} {fr ? 'sections' : 'sections'} ·{' '}
-              {bundle.height.toLocaleString()} px
+              {bundle.parts.length} sections · {bundle.height.toLocaleString(getUiLanguage())} px
               {bundle.incomplete ? (fr ? ' · Partielle' : ' · Partial') : ''}
             </span>
           </span>

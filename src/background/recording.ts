@@ -10,6 +10,7 @@
  * `false` (no async `sendResponse`) for everything except `REC_QUERY`.
  */
 import { mountRecordingOverlay } from '../content/recording-overlay';
+import { getMessage, initializeI18n } from '../shared/i18n';
 import {
   createSegment,
   createSession,
@@ -387,6 +388,23 @@ async function healOverlay(tabId: number): Promise<'fresh' | 'synced' | 'failed'
   if (!s) return 'failed';
   const elapsed = (s.pausedAt || Date.now()) - s.startedAt - s.pausedAccumMs;
   try {
+    await initializeI18n();
+    const labels = Object.fromEntries(
+      [
+        'recOverlayNotSaving',
+        'recOverlayCamDenied',
+        'recOverlayMic',
+        'recOverlayTabAudio',
+        'recOverlayWebcam',
+        'recOverlayStop',
+        'recOverlayCancel',
+        'recWebcamDenied',
+        'recOverlayResume',
+        'recOverlayPause',
+        'recOverlayReveal',
+        'recOverlayStarting',
+      ].map((id) => [id, getMessage(id)]),
+    );
     const [injection] = await chrome.scripting.executeScript({
       target: { tabId },
       func: mountRecordingOverlay,
@@ -404,6 +422,7 @@ async function healOverlay(tabId: number): Promise<'fresh' | 'synced' | 'failed'
         // read as unanchored and leave a live recording's bar on "Starting…".
         // Only an explicit false is unanchored.
         s.anchored !== false,
+        labels,
       ],
     });
     // The bar is on the page. If this run had reported that it could not get

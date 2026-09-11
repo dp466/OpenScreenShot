@@ -4,7 +4,7 @@
     "description": "Extension name shown in Chrome UI."
   },
   "extDesc": {
-    "message": "Capture d’écran pleine page en un clic. Open source, 100 % privé, sans compte, sans envoi.",
+    "message": "Capture d’écran pleine page en un clic. Logiciel libre, traitement local, sans compte ni téléversement.",
     "description": "Extension description shown in the Chrome Web Store and extensions page."
   },
   "modeFullPage": {
@@ -254,7 +254,7 @@
     "description": "Recording control bar: accessible name of the small always-present control that reveals the hidden bar, by pointer, touch or keyboard focus."
   },
   "recOverlayMic": {
-    "message": "MIC",
+    "message": "MICRO",
     "description": "Recording control bar: chip shown when the microphone track is enabled."
   },
   "recOverlayTabAudio": {
@@ -302,7 +302,7 @@
     "description": "Popup: toggle chip for the tab audio track."
   },
   "recWebcam": {
-    "message": "Webcam",
+    "message": "Caméra",
     "description": "Popup: toggle chip for the webcam track."
   },
   "recWebcamNoPreview": {
@@ -628,7 +628,7 @@
     "description": "Recorder page: label of the microphone volume slider."
   },
   "recorderBubble": {
-    "message": "Bulle webcam",
+    "message": "Bulle caméra",
     "description": "Recorder page: label of the webcam bubble settings section."
   },
   "recorderBubbleTL": {
@@ -656,7 +656,7 @@
     "description": "Recorder page: label of the toggle that hides the webcam bubble."
   },
   "recorderBeautify": {
-    "message": "Beautify",
+    "message": "Habillage",
     "description": "Recorder page: label of the toggle that frames the export in padding, corners, shadow, and a background."
   },
   "recorderBeautifyPadding": {
@@ -714,7 +714,7 @@
     "description": "Recorder page: warning shown for the whole export — a background tab throttles requestAnimationFrame and stalls the render."
   },
   "recorderExported": {
-    "message": "Enregistré : $SIZE$ MB",
+    "message": "Enregistré : $SIZE$ Mo",
     "description": "Recorder page: toast shown after an export is downloaded.",
     "placeholders": {
       "size": {
@@ -740,7 +740,7 @@
     "description": "Setup page: button on the ready banner that closes the tab."
   },
   "setupTrustOpenSource": {
-    "message": "Open source (MIT)",
+    "message": "Logiciel libre (MIT)",
     "description": "Setup page: trust pill linking to the GitHub repo."
   },
   "setupTrustLocal": {
@@ -1302,7 +1302,7 @@
     "description": "Editor tool rail: the Blur/redaction tool. Also the Blur redaction-mode option."
   },
   "editorToolSpotlight": {
-    "message": "Spotlight",
+    "message": "Mise en évidence",
     "description": "Editor tool rail: the Spotlight tool."
   },
   "editorToolEyedropper": {
@@ -1314,19 +1314,19 @@
     "description": "Editor tool rail: the Crop tool."
   },
   "editorToolCut": {
-    "message": "Cut",
+    "message": "Découper",
     "description": "Editor tool rail: the Cut tool."
   },
   "editorHintRect": {
-    "message": "Glissez pour tracer un rectangle · Shift le garde carré",
+    "message": "Glissez pour tracer un rectangle · Maj le garde carré",
     "description": "Editor status bar hint for the Rectangle tool."
   },
   "editorHintArrow": {
-    "message": "Glissez pour tracer une flèche · Shift aligne à 45°",
+    "message": "Glissez pour tracer une flèche · Maj aligne à 45°",
     "description": "Editor status bar hint for the Arrow tool."
   },
   "editorHintLine": {
-    "message": "Glissez pour tracer une ligne · Shift aligne à 45°",
+    "message": "Glissez pour tracer une ligne · Maj aligne à 45°",
     "description": "Editor status bar hint for the Line tool."
   },
   "editorHintPen": {
@@ -1350,7 +1350,7 @@
     "description": "Editor status bar hint for the Blur tool."
   },
   "editorHintSpotlight": {
-    "message": "Glissez pour garder une zone éclairée, le reste s’assombrit · Shift le garde carré",
+    "message": "Glissez pour garder une zone éclairée, le reste s’assombrit · Maj le garde carré",
     "description": "Editor status bar hint for the Spotlight tool."
   },
   "editorHintCrop": {
@@ -1626,7 +1626,7 @@
     "description": "Editor: the canvas’s long-form accessible description, nothing loaded."
   },
   "editorCanvasKeyboardHelp": {
-    "message": "Appuyez sur le crochet fermant pour sélectionner l’annotation suivante et sur le crochet ouvrant pour la précédente. Maintenez Shift avec l’un des crochets pour ajouter cette annotation à la sélection au lieu de la remplacer. Appuyez sur Enter pour placer l’outil choisi dans la barre d’outils. Utilisez les flèches pour déplacer la sélection d’un pixel, Shift et une flèche pour la déplacer de dix, et Alt et une flèche pour la redimensionner. Appuyez sur Alt et D pour dupliquer la sélection. Avec un recadrage ouvert, les flèches le déplacent, les crochets choisissent l’une de ses huit poignées, Alt et une flèche le redimensionnent depuis cette poignée, Enter l’applique et Escape l’annule. Avec l’outil Cut, Enter démarre une bande sur l’image, les flèches haut et bas la déplacent, Alt et une flèche la redimensionnent, Enter la retire et Escape l’annule. Appuyez sur Delete avec l’outil Cut pour remettre la coupe la plus proche.",
+    "message": "Appuyez sur le crochet fermant pour sélectionner l’annotation suivante et sur le crochet ouvrant pour la précédente. Maintenez Maj avec l’un des crochets pour ajouter cette annotation à la sélection au lieu de la remplacer. Appuyez sur Entrée pour placer l’outil choisi dans la barre d’outils. Utilisez les flèches pour déplacer la sélection d’un pixel, Maj et une flèche pour la déplacer de dix, et Alt et une flèche pour la redimensionner. Appuyez sur Alt et D pour dupliquer la sélection. Avec un recadrage ouvert, les flèches le déplacent, les crochets choisissent l’une de ses huit poignées, Alt et une flèche le redimensionnent depuis cette poignée, Entrée l’applique et Échap l’annule. Avec l’outil Découper, Entrée démarre une bande sur l’image, les flèches haut et bas la déplacent, Alt et une flèche la redimensionnent, Entrée la retire et Échap l’annule. Appuyez sur Suppr avec l’outil Découper pour remettre la coupe la plus proche.",
     "description": "Editor: the canvas’s long-form accessible description, the fixed keyboard-model instructions appended after the load-state sentence."
   },
   "editorDraftRestoreText": {
@@ -1780,7 +1780,7 @@
     "description": "Editor export dialog: the A4 PDF page size."
   },
   "editorLetter": {
-    "message": "Letter",
+    "message": "Lettre US",
     "description": "Editor export dialog: the Letter PDF page size."
   },
   "editorFull": {
@@ -1920,11 +1920,11 @@
     "description": "Editor shortcut sheet: command row."
   },
   "editorCmdCutTakeOut": {
-    "message": "Outil Cut : retirer la bande tracée",
+    "message": "Outil Découper : retirer la bande tracée",
     "description": "Editor shortcut sheet: command row."
   },
   "editorCmdCutPutBack": {
-    "message": "Outil Cut : remettre la coupe la plus proche",
+    "message": "Outil Découper : remettre la coupe la plus proche",
     "description": "Editor shortcut sheet: command row."
   },
   "editorCmdDeselectCancel": {
@@ -2014,7 +2014,7 @@
     "description": "Editor: stage notice shown when the browser lacks the Pin feature."
   },
   "editorPinFailedRetry": {
-    "message": "Impossible d’ouvrir la fenêtre épinglée : cliquez à nouveau sur Pin.",
+    "message": "Impossible d’ouvrir la fenêtre épinglée : cliquez à nouveau sur Épingler.",
     "description": "Editor: stage notice shown when opening the pinned window was blocked (no user activation)."
   },
   "editorPinFailedDetail": {
@@ -2132,11 +2132,11 @@
     "description": "Editor beautify menu: tooltip for the Cutout look."
   },
   "editorBeautify": {
-    "message": "Beautify",
+    "message": "Habillage",
     "description": "Editor: the Beautify menu’s trigger button, popover label, and on/off toggle text."
   },
   "editorBeautifyTitle": {
-    "message": "Beautify : marges, coins, ombre, fond",
+    "message": "Habillage : marges, coins, ombre et fond",
     "description": "Editor: tooltip for the Beautify menu trigger."
   },
   "editorLook": {
@@ -2286,7 +2286,7 @@
     "description": "Editor shortcut sheet: the \"keys\" column for a command with no key of its own, pointing at where to find it instead."
   },
   "popupTrustLine": {
-    "message": "Sur votre appareil · Open source · Aucun suivi",
+    "message": "Sur votre appareil · Logiciel libre · Aucun suivi",
     "description": "Popup: the one-line local-only assurance shown beside a permission ask."
   },
   "settingsSupport": {
@@ -2436,5 +2436,53 @@
   },
   "longPageOutputHint": {
     "message": "Les pages longues sont divisées automatiquement à pleine résolution. Choisissez l’export local souhaité, sans réduire le zoom."
+  },
+  "settingsLanguage": {
+    "message": "Langue de l’interface"
+  },
+  "languageFrench": {
+    "message": "Français"
+  },
+  "languageEnglish": {
+    "message": "English"
+  },
+  "languageBrowser": {
+    "message": "Langue du navigateur"
+  },
+  "settingsLanguageHint": {
+    "message": "S’applique aux menus de l’extension. Rouvrez les autres onglets de l’extension pour actualiser leur langue."
+  },
+  "commandCaptureFullPage": {
+    "message": "Capturer la page entière avec défilement"
+  },
+  "commandCaptureVisible": {
+    "message": "Capturer la zone visible"
+  },
+  "commandCaptureRegion": {
+    "message": "Capturer une zone sélectionnée"
+  },
+  "commandStopRecording": {
+    "message": "Arrêter l’enregistrement en cours"
+  },
+  "commandRevealRecordingBar": {
+    "message": "Afficher les commandes d’enregistrement"
+  },
+  "editorPageTitle": {
+    "message": "Éditeur de captures — OpenScreenShot Local"
+  },
+  "recorderPageTitle": {
+    "message": "Enregistrements — OpenScreenShot Local"
+  },
+  "setupPageTitle": {
+    "message": "Configuration de l’enregistrement — OpenScreenShot Local"
+  },
+  "captureResultsPageTitle": {
+    "message": "Captures longues — OpenScreenShot Local"
+  },
+  "regionCaptureAction": {
+    "message": "Capturer"
+  },
+  "settingsSaveFailed": {
+    "message": "Impossible d’enregistrer ces paramètres. Veuillez réessayer."
   }
 }

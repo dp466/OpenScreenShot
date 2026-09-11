@@ -1,3 +1,4 @@
+import { getMessage as t, getUiLanguage } from '../shared/i18n';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { BrandMark } from '../shared/BrandMark';
 import { IconPause, IconPlay, IconRedo, IconUndo } from '../shared/icons';
@@ -25,11 +26,6 @@ import { cursorDrawsPointer, cursorDrawsRipple } from './recorder-draft';
 import { cursorAt, normalizeClicks, normalizeMoves } from './events-map';
 import { REC_FAILURE_KEY, isRecFailure, recFailureMessageKey } from '../shared/rec-failure';
 import { cameraAt, EASE_MS } from './zoom';
-
-// i18n helper
-function t(id: string): string {
-  return chrome.i18n.getMessage(id) ?? id;
-}
 
 /** A session's chunk total, human-sized — the session list's only caller. */
 function formatBytes(bytes: number): string {
@@ -261,7 +257,7 @@ function SessionListView({ onOpen }: { onOpen: (id: string) => void }) {
           // chunk evidence can actually prove: 'off' is dropped, 'confirmed'
           // shows plain, 'requested' is hedged rather than asserted.
           const statuses = trackStatuses(session.settings, hasCamStream);
-          const hedge = (label: string) => chrome.i18n.getMessage('recorderTrackRequested', label);
+          const hedge = (label: string) => t('recorderTrackRequested', label);
           const tracks = [
             statuses.mic === 'confirmed'
               ? t('recMic')
@@ -278,7 +274,9 @@ function SessionListView({ onOpen }: { onOpen: (id: string) => void }) {
           return (
             <div class="rec-row" key={session.id} data-session-id={session.id}>
               <div class="rec-row-info">
-                <span class="rec-row-date">{new Date(session.createdAt).toLocaleString()}</span>
+                <span class="rec-row-date">
+                  {new Date(session.createdAt).toLocaleString(getUiLanguage())}
+                </span>
                 {live ? (
                   <span class="pill pill-live">{t('recorderRecordingNow')}</span>
                 ) : failed ? (

@@ -130,6 +130,8 @@ export function mountRecordingOverlay(
    * its own mount, which is the bug this replaces. See `anchoredElapsed`.
    */
   anchored: boolean,
+  /** Resolved in the worker, since injected functions cannot import the locale helper. */
+  labels: Record<string, string> = {},
 ): 'fresh' | 'synced' {
   type SyncFn = (
     elapsedMs: number,
@@ -138,6 +140,7 @@ export function mountRecordingOverlay(
     writeFailed: boolean,
     camDenied: boolean,
     anchored: boolean,
+    labels?: Record<string, string>,
   ) => void;
   const win = window as unknown as {
     __ossRecOverlay?: () => void;
@@ -145,7 +148,7 @@ export function mountRecordingOverlay(
     __ossRecReveal?: () => void;
   };
   if (win.__ossRecOverlay) {
-    win.__ossRecSync?.(elapsedMs, paused, tracks, writeFailed, camDenied, anchored);
+    win.__ossRecSync?.(elapsedMs, paused, tracks, writeFailed, camDenied, anchored, labels);
     return 'synced';
   }
 
@@ -197,6 +200,7 @@ export function mountRecordingOverlay(
   }
 
   function t(id: string, fallback: string): string {
+    if (labels[id]) return labels[id];
     try {
       const msg = chrome.i18n.getMessage(id);
       return msg ? msg : fallback;
@@ -776,7 +780,12 @@ export function mountRecordingOverlay(
     nextWriteFailed,
     nextCamDenied,
     nextAnchored,
+    nextLabels,
   ) => {
+    if (nextLabels) labels = nextLabels;
+    stopBtn.textContent = t('recOverlayStop', 'Stop');
+    cancelBtn.textContent = t('recOverlayCancel', 'Cancel');
+    grip.setAttribute('aria-label', t('recOverlayReveal', 'Show recording controls'));
     // Shift what is still buffered by the same amount the clock moves, so a
     // re-anchor cannot leave the last second of cursor events pointing at a
     // timestamp the video never had.

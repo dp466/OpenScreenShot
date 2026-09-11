@@ -132,10 +132,10 @@ async function flushMicrotasks(times = 10): Promise<void> {
  * another (the express migration reads, writes, then the menu build reads
  * settings), so a single drain pass is not enough.
  */
-async function releaseAllReads(rounds = 10): Promise<void> {
+async function releaseAllReads(rounds = 10, stored: Record<string, unknown> = {}): Promise<void> {
   for (let i = 0; i < rounds; i++) {
     await flushMicrotasks();
-    while (getResolvers.length > 0) getResolvers.shift()?.({});
+    while (getResolvers.length > 0) getResolvers.shift()?.(stored);
   }
   await flushMicrotasks();
 }
@@ -151,6 +151,27 @@ describe('createContextMenus concurrency', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('uses French menus on an English browser and updates titles when English is selected', async () => {
+    const mod = await import('../../src/background/index.ts');
+    const run = mod.createContextMenus();
+    await releaseAllReads();
+    await run;
+    const settingsMenu = fakeChrome.contextMenus.create.mock.calls.find(
+      ([props]) => props.id === 'oss-settings',
+    )?.[0] as { title?: string };
+    expect(settingsMenu.title).toBe('Paramètres');
+    for (const [changed] of fakeChrome.storage.onChanged.addListener.mock.calls) {
+      changed({ 'openscreenshot:settings': { newValue: { language: 'en' } } }, 'local');
+    }
+    await releaseAllReads(10, { 'openscreenshot:settings': { language: 'en' } });
+    expect(fakeChrome.contextMenus.update).toHaveBeenCalledWith(
+      'oss-settings',
+      { title: 'Settings' },
+      expect.any(Function),
+    );
+    expect(fakeChrome.i18n.getUILanguage()).toBe('en');
   });
 
   it('creates every menu id exactly once when two onInstalled events overlap', async () => {

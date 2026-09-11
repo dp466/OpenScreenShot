@@ -56,6 +56,8 @@ import {
 } from '../shared/capture-bundles';
 import { runFullPageSession } from './full-page-session';
 import { stitchCaptureSection } from './section-stitcher';
+import { getMessage, getUiLanguage, setUiLanguage } from '../shared/i18n';
+import { translateCaptureMessage } from '../shared/capture-message-i18n';
 
 const EDITOR_URL = chrome.runtime.getURL('src/editor/index.html');
 const POPUP_URL = 'src/popup/index.html';
@@ -128,7 +130,8 @@ export async function createContextMenus(): Promise<void> {
 }
 
 async function createContextMenusOnce(): Promise<void> {
-  const { expressMode } = await getSettings();
+  const { expressMode, language } = await getSettings();
+  setUiLanguage(language);
   await chrome.contextMenus.removeAll();
   chrome.contextMenus.create({
     id: 'oss-parent',
@@ -136,9 +139,9 @@ async function createContextMenusOnce(): Promise<void> {
     contexts: MENU_CONTEXTS,
   });
   const titles: Record<CaptureMode, string> = {
-    'full-page': chrome.i18n.getMessage('modeFullPage'),
-    visible: chrome.i18n.getMessage('modeVisible'),
-    region: chrome.i18n.getMessage('modeRegion'),
+    'full-page': getMessage('modeFullPage'),
+    visible: getMessage('modeVisible'),
+    region: getMessage('modeRegion'),
   };
   for (const mode of ['full-page', 'visible', 'region'] as const) {
     chrome.contextMenus.create({
@@ -156,12 +159,12 @@ async function createContextMenusOnce(): Promise<void> {
   chrome.contextMenus.create({
     id: MENU_SETTINGS_ID,
     parentId: 'oss-parent',
-    title: chrome.i18n.getMessage('settingsTitle'),
+    title: getMessage('settingsTitle'),
     contexts: MENU_CONTEXTS,
   });
   chrome.contextMenus.create({
     id: MENU_ICON_SETTINGS_ID,
-    title: chrome.i18n.getMessage('settingsTitle'),
+    title: getMessage('settingsTitle'),
     contexts: ['action'],
   });
   // Express lives on the icon's right-click menu: once it hijacks the icon
@@ -170,7 +173,7 @@ async function createContextMenusOnce(): Promise<void> {
     {
       id: MENU_EXPRESS_ID,
       type: 'checkbox',
-      title: chrome.i18n.getMessage('expressLabel'),
+      title: getMessage('expressLabel'),
       contexts: ['action'],
       checked: expressMode,
     },
@@ -186,11 +189,31 @@ async function createContextMenusOnce(): Promise<void> {
  * fails harmlessly before the checkbox exists (first run before onInstalled).
  */
 async function syncExpressMode(): Promise<void> {
-  const { expressMode } = await getSettings();
+  const { expressMode, language } = await getSettings();
+  setUiLanguage(language);
   await chrome.action.setPopup({ popup: expressMode ? '' : POPUP_URL });
   chrome.contextMenus.update(MENU_EXPRESS_ID, { checked: expressMode }, () => {
     void chrome.runtime.lastError;
   });
+  // Updating titles preserves existing menu IDs and the capture/recording job.
+  // Menu creation still belongs to the single-flight install/reload path.
+  const titles: Record<string, string> = {
+    [MENU_IDS['full-page']]: getMessage('modeFullPage'),
+    [MENU_IDS.visible]: getMessage('modeVisible'),
+    [MENU_IDS.region]: getMessage('modeRegion'),
+    [ICON_MENU_IDS['full-page']]: getMessage('modeFullPage'),
+    [ICON_MENU_IDS.visible]: getMessage('modeVisible'),
+    [ICON_MENU_IDS.region]: getMessage('modeRegion'),
+    [MENU_SETTINGS_ID]: getMessage('settingsTitle'),
+    [MENU_ICON_SETTINGS_ID]: getMessage('settingsTitle'),
+    [MENU_EXPRESS_ID]: getMessage('expressLabel'),
+    [MENU_REPEAT_ID]: getMessage('repeatLastRegion'),
+  };
+  for (const [id, title] of Object.entries(titles)) {
+    chrome.contextMenus.update(id, { title }, () => {
+      void chrome.runtime.lastError;
+    });
+  }
 }
 
 void syncExpressMode();
@@ -236,7 +259,7 @@ async function ensureRepeatMenuItem(): Promise<void> {
     {
       id: MENU_REPEAT_ID,
       parentId: 'oss-parent',
-      title: chrome.i18n.getMessage('repeatLastRegion'),
+      title: getMessage('repeatLastRegion'),
       contexts: MENU_CONTEXTS,
     },
     () => void chrome.runtime.lastError,
@@ -293,12 +316,14 @@ async function handleCapture(mode: CaptureMode, repeatRegion = false): Promise<v
 }
 
 async function runCapture(mode: CaptureMode, repeatRegion: boolean): Promise<void> {
+  const settings = await getSettings();
+  setUiLanguage(settings.language);
   const tab = await getActiveTab();
   if (!tab || tab.id == null) {
     broadcast({
       type: 'CAPTURE_ERROR',
       code: 'unknown',
-      message: chrome.i18n.getMessage('errNoTab'),
+      message: getMessage('errNoTab'),
     });
     return;
   }
@@ -306,11 +331,11 @@ async function runCapture(mode: CaptureMode, repeatRegion: boolean): Promise<voi
     broadcast({
       type: 'CAPTURE_ERROR',
       code: 'protected-page',
-      message: chrome.i18n.getMessage('errProtectedPage'),
+      message: getMessage('errProtectedPage'),
     });
     return;
   }
-  const delaySeconds = normalizeCaptureDelay((await getSettings()).captureDelay);
+  const delaySeconds = normalizeCaptureDelay(settings.captureDelay);
   if (delaySeconds > 0) {
     if (countdownActive) return; // one countdown at a time — ignore extra requests
     countdownActive = true;
@@ -431,12 +456,14 @@ async function captureRegion(tab: chrome.tabs.Tab, repeat = false): Promise<void
       broadcast({
         type: 'CAPTURE_ERROR',
         code: 'no-region',
-        message: chrome.i18n.getMessage('errNoRegion'),
+        message: getMessage('errNoRegion'),
       });
       return;
     }
   } else {
-    rect = await execInTab(tabId, selectRegion, []);
+    rect = await execInTab(tabId, selectRegion, [
+      { capture: getMessage('regionCaptureAction'), cancel: getMessage('editorCancel') },
+    ]);
     if (!rect) return; // user pressed Esc — nothing to capture
     await setLastRegion(rect);
     await ensureRepeatMenuItem();
@@ -473,7 +500,7 @@ async function captureFullPage(tab: chrome.tabs.Tab): Promise<void> {
     broadcast({
       type: 'CAPTURE_ERROR',
       code: 'blank-page',
-      message: chrome.i18n.getMessage('errBlankPage'),
+      message: getMessage('errBlankPage'),
     });
     return;
   }
@@ -584,8 +611,8 @@ async function showCaptureProgress(tabId: number, percent: number | null): Promi
   await runInTab(tabId, updateCaptureOverlay, [
     'show',
     percent,
-    chrome.i18n.getMessage(percent === null ? 'captureOverlayFinishing' : 'captureOverlayTitle'),
-    chrome.i18n.getMessage('captureOverlayDetail'),
+    getMessage(percent === null ? 'captureOverlayFinishing' : 'captureOverlayTitle'),
+    getMessage('captureOverlayDetail'),
   ]);
 }
 
@@ -633,7 +660,7 @@ async function deliverCapture(
       broadcast({
         type: 'CAPTURE_ERROR',
         code: 'quick-action',
-        message: chrome.i18n.getMessage('errClipboard'),
+        message: getMessage('errClipboard'),
       });
       return false;
     }
@@ -651,7 +678,7 @@ async function deliverCapture(
     broadcast({
       type: 'CAPTURE_ERROR',
       code: 'quick-action',
-      message: chrome.i18n.getMessage('errSave'),
+      message: getMessage('errSave'),
     });
     return false;
   }
@@ -678,11 +705,14 @@ function onCaptureError(err: unknown): void {
   broadcast({
     type: 'CAPTURE_ERROR',
     code: 'unknown',
-    message: chrome.i18n.getMessage('errUnknown'),
+    message: getMessage('errUnknown'),
   });
 }
 
 function broadcast(msg: PopupMessage): void {
+  if (msg.type === 'CAPTURE_ERROR') {
+    msg = { ...msg, message: translateCaptureMessage(msg.message, getUiLanguage()) };
+  }
   // Context menu, express and delayed captures have no popup to show a toast
   // in, so errors also flash the action badge.
   if (msg.type === 'CAPTURE_ERROR') void flashErrorBadge(msg.message);
