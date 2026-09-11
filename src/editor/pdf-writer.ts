@@ -81,20 +81,28 @@ class ByteBuffer {
   ascii(s: string): void {
     this.push(enc.encode(s));
   }
-  concat(): Uint8Array<ArrayBuffer> {
-    const out = new Uint8Array(this.len);
-    let o = 0;
-    for (const p of this.parts) {
-      out.set(p, o);
-      o += p.length;
-    }
-    return out;
+  blob(): Blob {
+    return new Blob(this.parts, { type: 'application/pdf' });
   }
 }
 
 export async function buildPdf(pages: PdfPage[]): Promise<Blob> {
-  const images = await Promise.all(pages.map((p) => encodeImage(p.image.canvas)));
-  const objCount = 2 + pages.length * 3; // catalog + pages tree + (page, content, image) per page
+  return buildPdfSequential(pages, pages.length);
+}
+
+/**
+ * Pull and encode one page at a time. An async generator can free its page
+ * canvas and current section bitmap before reading the next section; only
+ * compressed PDF objects accumulate. No full-document canvas is allocated.
+ */
+export async function buildPdfSequential(
+  pages: AsyncIterable<PdfPage> | Iterable<PdfPage>,
+  pageCount: number,
+): Promise<Blob> {
+  if (!Number.isSafeInteger(pageCount) || pageCount < 1) {
+    throw new Error('PDF export needs at least one page.');
+  }
+  const objCount = 2 + pageCount * 3; // catalog + pages tree + (page, content, image) per page
   const offsets: number[] = new Array(objCount + 1).fill(0);
   const b = new ByteBuffer();
 
@@ -109,14 +117,16 @@ export async function buildPdf(pages: PdfPage[]): Promise<Blob> {
   b.ascii('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n');
 
   startObj(2);
-  const kids = pages.map((_, i) => `${3 + i * 3} 0 R`).join(' ');
-  b.ascii(`2 0 obj\n<< /Type /Pages /Kids [ ${kids} ] /Count ${pages.length} >>\nendobj\n`);
+  const kids = Array.from({ length: pageCount }, (_, i) => `${3 + i * 3} 0 R`).join(' ');
+  b.ascii(`2 0 obj\n<< /Type /Pages /Kids [ ${kids} ] /Count ${pageCount} >>\nendobj\n`);
 
-  pages.forEach((p, i) => {
+  let i = 0;
+  for await (const p of pages) {
+    if (i >= pageCount) throw new Error('PDF page count changed during export.');
     const pageNum = 3 + i * 3;
     const contentNum = pageNum + 1;
     const imgNum = pageNum + 2;
-    const img = images[i];
+    const img = await encodeImage(p.image.canvas);
     const { image } = p;
     const yFlip = p.heightPt - image.yPt - image.hPt;
     const content =
@@ -146,7 +156,9 @@ export async function buildPdf(pages: PdfPage[]): Promise<Blob> {
     );
     b.push(img.data);
     b.ascii('\nendstream\nendobj\n');
-  });
+    i++;
+  }
+  if (i !== pageCount) throw new Error('PDF page count changed during export.');
 
   const xrefOff = b.len;
   b.ascii(`xref\n0 ${objCount + 1}\n0000000000 65535 f \n`);
@@ -155,5 +167,5 @@ export async function buildPdf(pages: PdfPage[]): Promise<Blob> {
   }
   b.ascii(`trailer\n<< /Size ${objCount + 1} /Root 1 0 R >>\nstartxref\n${xrefOff}\n%%EOF\n`);
 
-  return new Blob([b.concat()], { type: 'application/pdf' });
+  return b.blob();
 }

@@ -7,6 +7,12 @@ import type {
   Settings,
 } from '../shared/types';
 import { DEFAULT_SETTINGS } from '../shared/types';
+import {
+  IMAGE_WAIT_TIMEOUT_MAX_MS,
+  IMAGE_WAIT_TIMEOUT_MIN_MS,
+  SCROLL_DELAY_MAX_MS,
+  SCROLL_DELAY_MIN_MS,
+} from '../shared/capture-settings';
 import { getLastRegion, getSettings, hasLastCapture, setSettings } from '../shared/storage';
 import { onPopupMessage, sendToBackground } from '../shared/messaging';
 import { BrandMark } from '../shared/BrandMark';
@@ -56,6 +62,7 @@ import {
   type RecFailureCode,
 } from '../shared/rec-failure';
 import { applyTheme, watchSystemTheme } from '../shared/theme';
+import { RecentLongCaptures } from '../capture-results/RecentLongCaptures';
 
 // i18n helper
 function t(id: string): string {
@@ -738,6 +745,8 @@ export function App() {
             })}
           </nav>
 
+          <RecentLongCaptures />
+
           <span class="settings-section">{t('popupSectionRecord')}</span>
           {recState?.active ? (
             <div class="mode-card rec-live">
@@ -998,7 +1007,7 @@ function SettingsView({
         </div>
         <div class="settings-row">
           <span class="settings-label" id="capture-delay-label">
-            {t('delayLabel')}
+            {t('initialCountdownLabel')}
           </span>
           <div class="settings-control">
             <div class="seg" role="group" aria-labelledby="capture-delay-label">
@@ -1013,6 +1022,90 @@ function SettingsView({
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+        <div class="settings-row">
+          <label class="settings-label" for="scroll-delay">
+            {t('scrollDelayLabel')}
+          </label>
+          <div class="settings-control">
+            <div class="settings-control settings-quality">
+              <input
+                id="scroll-delay"
+                class="range"
+                type="range"
+                min={SCROLL_DELAY_MIN_MS}
+                max={SCROLL_DELAY_MAX_MS}
+                step="100"
+                aria-describedby="scroll-delay-hint"
+                aria-valuetext={`${settings.scrollDelayMs / 1000} s`}
+                value={settings.scrollDelayMs}
+                onInput={(e) => onChange({ scrollDelayMs: Number(e.currentTarget.value) })}
+              />
+              <output for="scroll-delay">{settings.scrollDelayMs / 1000} s</output>
+            </div>
+            <p class="settings-hint" id="scroll-delay-hint">
+              {t('scrollDelayHint')}
+            </p>
+          </div>
+        </div>
+        <div class="settings-row settings-row-switch">
+          <div class="settings-copy">
+            <label class="settings-label" for="wait-for-images">
+              {t('waitForImagesLabel')}
+            </label>
+            <p class="settings-hint" id="wait-for-images-hint">
+              {t('waitForImagesHint')}
+            </p>
+          </div>
+          <input
+            id="wait-for-images"
+            type="checkbox"
+            class="switch"
+            aria-describedby="wait-for-images-hint"
+            checked={settings.waitForImages}
+            onChange={(e) => onChange({ waitForImages: e.currentTarget.checked })}
+          />
+        </div>
+        {settings.waitForImages && (
+          <div class="settings-row">
+            <label class="settings-label" for="image-wait-timeout">
+              {t('imageWaitTimeoutLabel')}
+            </label>
+            <div class="settings-control settings-quality">
+              <input
+                id="image-wait-timeout"
+                class="range"
+                type="range"
+                min={IMAGE_WAIT_TIMEOUT_MIN_MS}
+                max={IMAGE_WAIT_TIMEOUT_MAX_MS}
+                step="1000"
+                aria-valuetext={`${settings.imageWaitTimeoutMs / 1000} s`}
+                value={settings.imageWaitTimeoutMs}
+                onInput={(e) => onChange({ imageWaitTimeoutMs: Number(e.currentTarget.value) })}
+              />
+              <output for="image-wait-timeout">{settings.imageWaitTimeoutMs / 1000} s</output>
+            </div>
+          </div>
+        )}
+        <div class="settings-row">
+          <span class="settings-label" id="long-page-output-label">
+            {t('longPageOutputLabel')}
+          </span>
+          <div class="settings-control">
+            <div class="seg" role="group" aria-labelledby="long-page-output-label">
+              {(['pdf', 'png'] as const).map((format) => (
+                <button
+                  key={format}
+                  class="seg-btn"
+                  aria-pressed={settings.longPageOutput === format}
+                  onClick={() => onChange({ longPageOutput: format })}
+                >
+                  {t(format === 'pdf' ? 'longPagePdf' : 'longPagePng')}
+                </button>
+              ))}
+            </div>
+            <p class="settings-hint">{t('longPageOutputHint')}</p>
           </div>
         </div>
         <div class="settings-row settings-row-switch">

@@ -2406,5 +2406,35 @@
   "captureOverlayFinishing": {
     "message": "Finalisation de la capture…",
     "description": "Capture overlay status."
+  },
+  "initialCountdownLabel": {
+    "message": "Compte à rebours initial"
+  },
+  "scrollDelayLabel": {
+    "message": "Pause après chaque défilement"
+  },
+  "scrollDelayHint": {
+    "message": "Attendre avant chaque capture de la page, après le défilement."
+  },
+  "waitForImagesLabel": {
+    "message": "Attendre les images visibles"
+  },
+  "waitForImagesHint": {
+    "message": "Accorder plus de temps aux images encore en chargement après la pause."
+  },
+  "imageWaitTimeoutLabel": {
+    "message": "Attente supplémentaire maximale"
+  },
+  "longPageOutputLabel": {
+    "message": "Export des pages longues"
+  },
+  "longPagePdf": {
+    "message": "Un seul PDF"
+  },
+  "longPagePng": {
+    "message": "Sections PNG"
+  },
+  "longPageOutputHint": {
+    "message": "Les pages longues sont divisées automatiquement à pleine résolution. Choisissez l’export local souhaité, sans réduire le zoom."
   }
 }

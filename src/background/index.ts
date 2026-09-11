@@ -12,7 +12,7 @@
  * the user's capture action: opened in the editor, copied to the clipboard, or
  * downloaded directly.
  */
-import type { CaptureMode, CaptureRequest, PopupMessage, TileSpec } from '../shared/types';
+import type { CaptureMode, CaptureRequest, PopupMessage } from '../shared/types';
 import {
   getLastRegion,
   getSettings,
@@ -31,7 +31,7 @@ import {
   normalizeCaptureAction,
   normalizeCaptureDelay,
 } from '../shared/utils';
-import { clampRegionRect, computeScrollPositions, MAX_CANVAS_HEIGHT_PX } from '../shared/geometry';
+import { clampRegionRect } from '../shared/geometry';
 import { recordExportSuccess } from '../shared/rating';
 import {
   cropTile,
@@ -39,31 +39,26 @@ import {
   hideFixedElements,
   prepareCapture,
   restoreCapture,
-  scrollToPosition,
-  stitchTiles,
+  scrollAndWait,
 } from '../content/scroll-capture';
 import { updateCaptureOverlay } from '../content/capture-overlay';
 import { selectRegion } from '../content/region-select';
 import { copyImageToClipboard } from '../content/clipboard';
 import { restoreRecBadge } from './recording';
+import { normalizeFullPageSettings } from '../shared/capture-settings';
+import {
+  appendCapturePart,
+  createCaptureBundle,
+  deleteCaptureBundle,
+  finishCaptureBundle,
+  getCaptureBundle,
+  readCapturePart,
+} from '../shared/capture-bundles';
+import { runFullPageSession } from './full-page-session';
+import { stitchCaptureSection } from './section-stitcher';
 
 const EDITOR_URL = chrome.runtime.getURL('src/editor/index.html');
 const POPUP_URL = 'src/popup/index.html';
-/**
- * First-run page: a tall article that invites the first capture, hosted on the
- * site rather than bundled. It has to be an ordinary https page — Chrome
- * refuses script injection into a chrome-extension:// tab whatever the
- * manifest asks for, so a bundled welcome page is the one page the capture it
- * invites can never read. Carries the version and UI language only, same as
- * UNINSTALL_URL; the page reads `hl` to send the visitor to their own locale.
- */
-const WELCOME_URL = 'https://openscreenshot.app/welcome';
-/**
- * Where an uninstall lands (Surface D of the rating funnel). Query carries
- * the extension version and UI locale only — never a page URL, title, or
- * capture.
- */
-const UNINSTALL_URL = 'https://openscreenshot.app/uninstall';
 /** The popup page opened as a tab, straight into its settings pane. */
 const SETTINGS_TAB_URL = chrome.runtime.getURL('src/popup/index.html?settings=1');
 /** Icon context-menu checkbox that toggles express mode. */
@@ -83,31 +78,14 @@ const ICON_MENU_IDS: Record<CaptureMode, string> = {
   region: 'oss-icon-region',
 };
 
-/** Minimum gap between `captureVisibleTab` calls — Chrome throttles to ~2/sec. */
-const CAPTURE_THROTTLE_MS = 500;
 /** Time to let the page paint/composite after each scroll before capturing. */
 const PAINT_SETTLE_MS = 60;
 
-// A fresh install opens the welcome page — a tall article built to make the
-// first one-click capture look good. Updates open nothing. The express
-// migration runs before the menus so the checkbox reads the post-migration
-// value.
+// The local build initializes its menus without contacting a vendor website.
 chrome.runtime.onInstalled.addListener((details) => {
   void migrateExpressDefault(details.reason).then(() => createContextMenus());
-  if (details.reason === 'install') void chrome.tabs.create({ url: welcomeUrl() });
 });
-
-/** The welcome URL with the same two values the uninstall URL carries. */
-function welcomeUrl(): string {
-  const manifest = chrome.runtime.getManifest();
-  return `${WELCOME_URL}?v=${manifest.version}&hl=${chrome.i18n.getUILanguage()}`;
-}
-
-// Registered on every worker start so it survives service-worker restarts.
-// Version and locale only — see UNINSTALL_URL.
-void chrome.runtime.setUninstallURL(
-  `${UNINSTALL_URL}?v=${chrome.runtime.getManifest().version}&hl=${chrome.i18n.getUILanguage()}`,
-);
+void chrome.runtime.setUninstallURL('');
 
 /** Contexts the capture menu appears in — everywhere on a page. */
 const MENU_CONTEXTS: NonNullable<chrome.contextMenus.CreateProperties['contexts']> = [
@@ -405,7 +383,17 @@ async function captureVisibleTabPng(tabId: number, windowId: number): Promise<st
   // Fail closed if hiding fails; a progress card must never enter the image.
   await runInTab(tabId, updateCaptureOverlay, ['hide']);
   await delay(PAINT_SETTLE_MS);
-  return chrome.tabs.captureVisibleTab(windowId, { format: 'png' });
+  const assertTargetActive = async () => {
+    const [active] = await chrome.tabs.query({ active: true, windowId });
+    if (active?.id !== tabId)
+      throw new Error(
+        'Capture stopped because you switched tabs. Keep the source tab active while capturing.',
+      );
+  };
+  await assertTargetActive();
+  const image = await chrome.tabs.captureVisibleTab(windowId, { format: 'png' });
+  await assertTargetActive();
+  return image;
 }
 
 async function captureVisible(tab: chrome.tabs.Tab): Promise<void> {
@@ -489,20 +477,14 @@ async function captureFullPage(tab: chrome.tabs.Tab): Promise<void> {
     });
     return;
   }
-  const dpr = metrics.devicePixelRatio;
-  const canvasHeight = Math.round(metrics.scrollHeight * dpr);
-  if (canvasHeight > MAX_CANVAS_HEIGHT_PX) {
-    broadcast({
-      type: 'CAPTURE_ERROR',
-      code: 'too-large',
-      message: chrome.i18n.getMessage('errTooLarge', String(canvasHeight)),
-    });
-    return;
-  }
-
-  const positions = computeScrollPositions(metrics.scrollHeight, metrics.viewportHeight);
+  const settings = normalizeFullPageSettings(await getSettings());
+  const bundle = await createCaptureBundle({
+    title: tab.title ?? '',
+    url: tab.url ?? '',
+    output: settings.longPageOutput,
+  });
   const windowId = tab.windowId ?? chrome.windows.WINDOW_ID_CURRENT;
-  // When an inner element scrolls, crop each viewport tile to its rect (device px).
+  const dpr = metrics.devicePixelRatio;
   const crop = metrics.container
     ? {
         x: Math.round(metrics.container.x * dpr),
@@ -511,56 +493,78 @@ async function captureFullPage(tab: chrome.tabs.Tab): Promise<void> {
         h: Math.round(metrics.container.height * dpr),
       }
     : null;
-  const canvasWidth = crop ? crop.w : Math.round(metrics.viewportWidth * dpr);
-
+  // A bounded image wait may exceed the MV3 idle interval at the maximum
+  // settings. A local browser API heartbeat keeps the active job alive.
+  const heartbeat = setInterval(() => {
+    void chrome.action.getTitle({}).catch(() => undefined);
+  }, 15_000);
   try {
-    // Disable smooth scrolling (but keep fixed elements visible) for the first tile.
-    const tiles: TileSpec[] = [];
+    let result;
     try {
       await runInTab(tabId, prepareCapture, []);
       await showCaptureProgress(tabId, 0);
-      // Tile 0: capture at the top with fixed elements visible so a fixed header
-      // appears once at the top of the final image (instead of being omitted).
-      {
-        await execInTab(tabId, scrollToPosition, [positions[0]]);
-        const first = await captureVisibleTabPng(tabId, windowId);
-        tiles.push({ dataUrl: first, y: 0 });
-        await reportProgress(tabId, 1, positions.length);
-      }
-      // Remaining tiles: hide fixed elements so they don't duplicate.
-      if (positions.length > 1) {
-        await runInTab(tabId, hideFixedElements, []);
-        for (let i = 1; i < positions.length; i++) {
-          await delay(CAPTURE_THROTTLE_MS);
-          const { scrollY } = await execInTab(tabId, scrollToPosition, [positions[i]]);
-          const dataUrl = await captureVisibleTabPng(tabId, windowId);
-          tiles.push({ dataUrl, y: Math.round(scrollY * dpr) });
-          await reportProgress(tabId, i + 1, positions.length);
-        }
-      }
+      result = await runFullPageSession(metrics, {
+        scroll: (y) =>
+          execInTab(tabId, scrollAndWait, [
+            y,
+            settings.scrollDelayMs,
+            settings.waitForImages,
+            settings.imageWaitTimeoutMs,
+          ]),
+        capture: () => captureVisibleTabPng(tabId, windowId),
+        hideFixed: () => runInTab(tabId, hideFixedElements, []),
+        progress: (done, total) => reportProgress(tabId, Math.min(done, total - 1), total),
+        stitch: (tiles, width, height) => stitchCaptureSection(tiles, width, height, crop),
+        save: async (dataUrl, width, height, y) => {
+          await appendCapturePart(bundle.id, { dataUrl, width, height, y });
+        },
+      });
     } finally {
-      await runInTab(tabId, restoreCapture, []);
+      await runInTab(tabId, restoreCapture, []).catch(() => undefined);
     }
-
-    const dataUrl = await execInTab(tabId, stitchTiles, [tiles, canvasWidth, canvasHeight, crop]);
-    const delivered = await deliverCapture(
-      tabId,
-      dataUrl,
-      canvasWidth,
-      canvasHeight,
-      'full-page',
-      tab.title ?? '',
-      tab.url ?? '',
-    );
-    if (delivered) {
+    await finishCaptureBundle(bundle.id, result);
+    const finished = await getCaptureBundle(bundle.id);
+    if (!finished?.parts.length) throw new Error('No capture sections were saved.');
+    if (finished.parts.length === 1 && !result.incomplete && result.warnings.length === 0) {
+      const dataUrl = await readCapturePart(bundle.id, 0);
+      const delivered = await deliverCapture(
+        tabId,
+        dataUrl,
+        result.width,
+        result.height,
+        'full-page',
+        tab.title ?? '',
+        tab.url ?? '',
+      );
+      if (delivered) {
+        await deleteCaptureBundle(bundle.id);
+        broadcast({
+          type: 'CAPTURE_COMPLETE',
+          imageUrl: dataUrl,
+          width: result.width,
+          height: result.height,
+        });
+      }
+    } else {
+      await chrome.tabs.create({
+        url: chrome.runtime.getURL(
+          `src/capture-results/index.html?id=${encodeURIComponent(bundle.id)}`,
+        ),
+      });
+      await restoreRecBadge();
       broadcast({
         type: 'CAPTURE_COMPLETE',
-        imageUrl: dataUrl,
-        width: canvasWidth,
-        height: canvasHeight,
+        imageUrl: '',
+        width: result.width,
+        height: result.height,
       });
     }
+  } catch (error) {
+    const saved = await getCaptureBundle(bundle.id).catch(() => null);
+    if (!saved?.parts.length) await deleteCaptureBundle(bundle.id).catch(() => undefined);
+    throw error;
   } finally {
+    clearInterval(heartbeat);
     await removeCaptureProgress(tabId);
   }
 }

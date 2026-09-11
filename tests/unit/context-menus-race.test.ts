@@ -177,11 +177,9 @@ describe('createContextMenus concurrency', () => {
 });
 
 /**
- * A fresh install opens exactly one tab: the welcome page (rating funnel
- * Surface A). An update opens nothing — the update-time welcome is the
- * pattern users report extensions for. The setup page stays reachable only
- * from a failure, as before. These read the listener the module actually
- * registered and fire it rather than trusting the source.
+ * The local capture build opens no vendor pages on install or update and
+ * clears any inherited uninstall destination. These exercise the registered
+ * listener, while also proving that menu initialization still completes.
  */
 describe('onInstalled', () => {
   beforeEach(() => {
@@ -211,12 +209,9 @@ describe('onInstalled', () => {
   const openedUrls = () =>
     fakeChrome.tabs.create.mock.calls.map(([opts]) => (opts as { url: string }).url);
 
-  it('opens exactly the hosted welcome page on a fresh install', async () => {
+  it('opens no external welcome page on a fresh install and still builds the menus', async () => {
     await fireOnInstalled('install');
-    // https, not chrome-extension://: an extension page is one no capture can
-    // read, and this page's whole job is to be the first capture. Version and
-    // UI language only — the same two values the uninstall URL carries.
-    expect(openedUrls()).toEqual(['https://openscreenshot.app/welcome?v=1.6.0&hl=en']);
+    expect(openedUrls()).toEqual([]);
     // The install still has to build the menus — the assertion above must not
     // pass by the listener having stopped doing its real work.
     expect(new Set(createdIds)).toEqual(new Set(ALL_MENU_IDS));
@@ -225,5 +220,10 @@ describe('onInstalled', () => {
   it('opens no tab on an update', async () => {
     await fireOnInstalled('update');
     expect(openedUrls()).toEqual([]);
+  });
+
+  it('clears the automatic uninstall destination when the worker starts', async () => {
+    await import('../../src/background/index.ts');
+    expect(fakeChrome.runtime.setUninstallURL).toHaveBeenCalledExactlyOnceWith('');
   });
 });

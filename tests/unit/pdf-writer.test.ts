@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildPdf, encodeImage } from '../../src/editor/pdf-writer';
+import {
+  buildPdf,
+  buildPdfSequential,
+  encodeImage,
+  type PdfPage,
+} from '../../src/editor/pdf-writer';
 
 /** Minimal HTMLCanvasElement stand-in exposing what pdf-writer reads. */
 function fakeCanvas(width: number, height: number, rgba: number[]): HTMLCanvasElement {
@@ -68,5 +73,49 @@ describe('buildPdf', () => {
     expect(text).toContain('/Count 2');
     // 2 + 3*2 = 8 objects -> xref subsection header "0 9"
     expect(text).toContain('xref\n0 9\n');
+  });
+});
+
+describe('buildPdfSequential', () => {
+  it('fully encodes each page before requesting the next source canvas', async () => {
+    const events: string[] = [];
+    async function* pages(): AsyncGenerator<PdfPage> {
+      for (let i = 0; i < 3; i++) {
+        events.push(`produce-${i}`);
+        const canvas = {
+          width: 1,
+          height: 1,
+          getContext: () => ({
+            getImageData: () => {
+              events.push(`encode-${i}`);
+              return { data: new Uint8ClampedArray([i, i, i, 255]) };
+            },
+          }),
+        } as unknown as HTMLCanvasElement;
+        yield { widthPt: 595, heightPt: 842, image: { canvas, xPt: 0, yPt: 0, wPt: 1, hPt: 1 } };
+        events.push(`release-${i}`);
+      }
+    }
+    const blob = await buildPdfSequential(pages(), 3);
+    expect(events).toEqual([
+      'produce-0',
+      'encode-0',
+      'release-0',
+      'produce-1',
+      'encode-1',
+      'release-1',
+      'produce-2',
+      'encode-2',
+      'release-2',
+    ]);
+    expect(await blob.text()).toContain('/Count 3');
+  });
+
+  it('rejects truncated or extra page streams instead of producing an invalid PDF', async () => {
+    const canvas = fakeCanvas(1, 1, [0, 0, 0, 255]);
+    const page = { widthPt: 1, heightPt: 1, image: { canvas, xPt: 0, yPt: 0, wPt: 1, hPt: 1 } };
+    await expect(buildPdfSequential([page], 2)).rejects.toThrow('page count changed');
+    await expect(buildPdfSequential([page, page], 1)).rejects.toThrow('page count changed');
+    await expect(buildPdfSequential([], 0)).rejects.toThrow('at least one');
   });
 });

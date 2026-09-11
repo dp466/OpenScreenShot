@@ -2406,5 +2406,35 @@
   "captureOverlayFinishing": {
     "message": "正在完成截图…",
     "description": "Capture overlay status."
+  },
+  "initialCountdownLabel": {
+    "message": "Initial countdown"
+  },
+  "scrollDelayLabel": {
+    "message": "Pause after each scroll"
+  },
+  "scrollDelayHint": {
+    "message": "Wait before every full-page capture step, after scrolling."
+  },
+  "waitForImagesLabel": {
+    "message": "Wait for visible images"
+  },
+  "waitForImagesHint": {
+    "message": "Allow extra time for images that are still loading after the pause."
+  },
+  "imageWaitTimeoutLabel": {
+    "message": "Maximum extra image wait"
+  },
+  "longPageOutputLabel": {
+    "message": "Long-page export"
+  },
+  "longPagePdf": {
+    "message": "One PDF"
+  },
+  "longPagePng": {
+    "message": "PNG sections"
+  },
+  "longPageOutputHint": {
+    "message": "Long pages split automatically at full resolution. Choose the preferred local export; no zoom needed."
   }
 }

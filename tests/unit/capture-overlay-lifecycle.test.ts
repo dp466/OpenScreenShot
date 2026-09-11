@@ -1,14 +1,87 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { CaptureBundle } from '../../src/shared/capture-bundles';
 
 vi.mock('../../src/background/recording', () => ({ restoreRecBadge: vi.fn() }));
+vi.mock('../../src/background/section-stitcher', () => ({
+  stitchCaptureSection: vi.fn(async (_tiles: unknown, _width: number, height: number) => {
+    events.push('stitchCaptureSection');
+    if (failAt === 'stitchCaptureSection') throw new Error('stitch failed');
+    stitchedHeights.push(height);
+    return 'data:image/png;base64,finished';
+  }),
+}));
 vi.mock('../../src/shared/storage', () => ({
-  getSettings: async () => ({ captureDelay: 0, captureAction: 'editor', expressMode: true }),
+  getSettings: async () => ({
+    captureDelay: 0,
+    captureAction: 'editor',
+    expressMode: true,
+    scrollDelayMs: 1500,
+    waitForImages: true,
+    imageWaitTimeoutMs: 10000,
+    longPageOutput: 'pdf',
+  }),
   getLastRegion: async () => ({ x: 20, y: 20, width: 100, height: 100 }),
   setLastRegion: vi.fn(),
   setLastCapture: vi.fn(),
   setSettings: vi.fn(),
   migrateExpressDefault: vi.fn(),
   onSettingsChanged: vi.fn(),
+}));
+vi.mock('../../src/shared/capture-bundles', () => ({
+  createCaptureBundle: vi.fn(async (input: Pick<CaptureBundle, 'title' | 'url' | 'output'>) => {
+    bundle = {
+      ...input,
+      id: 'local-test-capture',
+      width: 0,
+      height: 0,
+      parts: [],
+      warnings: [],
+      incomplete: true,
+      createdAt: Date.now(),
+    };
+    return bundle;
+  }),
+  appendCapturePart: vi.fn(
+    async (
+      _id: string,
+      input: {
+        dataUrl: string;
+        width: number;
+        height: number;
+        y: number;
+      },
+    ) => {
+      const part = {
+        index: bundle!.parts.length,
+        width: input.width,
+        height: input.height,
+        y: input.y,
+      };
+      partData.push(input.dataUrl);
+      bundle!.parts.push(part);
+      bundle!.width = input.width;
+      bundle!.height = input.y + input.height;
+      return part;
+    },
+  ),
+  finishCaptureBundle: vi.fn(
+    async (
+      _id: string,
+      input: {
+        height: number;
+        warnings: string[];
+        incomplete: boolean;
+      },
+    ) => {
+      Object.assign(bundle!, input);
+      finishedBundle = structuredClone(bundle);
+    },
+  ),
+  getCaptureBundle: vi.fn(async () => bundle),
+  readCapturePart: vi.fn(async (_id: string, index: number) => partData[index]),
+  deleteCaptureBundle: vi.fn(async () => {
+    bundle = null;
+  }),
 }));
 
 // Chrome is the external boundary: record injection/capture ordering while the
@@ -20,6 +93,19 @@ let failAt: string | undefined;
 let captures: number;
 let overlayVisible: boolean;
 let fakeChrome: ReturnType<typeof makeChrome>;
+let bundle: CaptureBundle | null;
+let finishedBundle: CaptureBundle | null;
+let partData: string[];
+let activeTabId: number;
+let switchOnScroll: boolean;
+let switchAfterSnapshot: number | undefined;
+let destinations: string[];
+let scrollPositions: number[];
+let scrollArguments: unknown[][];
+let stitchedHeights: number[];
+let pageHeight: number;
+let closeOnSecondScroll: boolean;
+let pageUnavailable: boolean;
 function makeChrome() {
   const noop = vi.fn(async () => undefined);
   return {
@@ -52,9 +138,13 @@ function makeChrome() {
     i18n: { getMessage: (key: string) => key, getUILanguage: () => 'en' },
     windows: { WINDOW_ID_CURRENT: -2 },
     tabs: {
-      query: async () => [{ id: 7, windowId: 1, url: 'https://example.com', title: 'Example' }],
-      create: async () => {
+      query: async () =>
+        pageUnavailable
+          ? []
+          : [{ id: activeTabId, windowId: 1, url: 'https://example.com', title: 'Example' }],
+      create: async ({ url }: { url: string }) => {
         events.push('deliver');
+        destinations.push(url);
         if (failAt === 'deliver') throw new Error('delivery failed');
       },
       captureVisibleTab: async () => {
@@ -62,6 +152,7 @@ function makeChrome() {
         expect(overlayVisible, 'overlay must never be visible in captured pixels').toBe(false);
         captures++;
         if (failAt === `snapshot:${captures}`) throw new Error('capture failed');
+        if (captures === switchAfterSnapshot) activeTabId = 8;
         return 'data:image/png;base64,tile';
       },
     },
@@ -76,6 +167,11 @@ function makeChrome() {
         const name = func.name;
         const event = name === 'updateCaptureOverlay' ? `overlay:${args[0]}` : name;
         events.push(event);
+        if (name === 'scrollAndWait' && closeOnSecondScroll && scrollPositions.length === 1) {
+          pageUnavailable = true;
+          overlayVisible = false;
+        }
+        if (pageUnavailable) throw new Error('The source tab closed.');
         if (event === failAt) throw new Error('injection failed');
         if (name === 'updateCaptureOverlay') overlayVisible = args[0] === 'show';
         let result: unknown;
@@ -83,14 +179,32 @@ function makeChrome() {
           result = {
             viewportWidth: 800,
             viewportHeight: 600,
-            scrollHeight: 1500,
+            scrollHeight: pageHeight,
             devicePixelRatio: 1,
             container: null,
           };
         if (name === 'scrollToPosition') result = { scrollY: args[0], atBottom: false };
+        if (name === 'scrollAndWait') {
+          scrollArguments.push(args);
+          const scrollY = Math.min(Math.max(0, pageHeight - 600), Math.max(0, Number(args[0])));
+          scrollPositions.push(scrollY);
+          if (switchOnScroll) activeTabId = 8;
+          result = {
+            viewportWidth: 800,
+            viewportHeight: 600,
+            scrollHeight: pageHeight,
+            devicePixelRatio: 1,
+            container: null,
+            scrollY,
+            atBottom: scrollY >= pageHeight - 600,
+            timedOut: false,
+            pendingImages: 0,
+            failedImages: 0,
+            cancelled: false,
+          };
+        }
         if (name === 'selectRegion') result = { x: 20, y: 20, width: 100, height: 100 };
-        if (name === 'stitchTiles' || name === 'cropTile')
-          result = 'data:image/png;base64,finished';
+        if (name === 'cropTile') result = 'data:image/png;base64,finished';
         return [{ result }];
       },
     },
@@ -109,6 +223,19 @@ beforeEach(async () => {
   captures = 0;
   overlayVisible = false;
   failAt = undefined;
+  bundle = null;
+  finishedBundle = null;
+  partData = [];
+  activeTabId = 7;
+  switchOnScroll = false;
+  switchAfterSnapshot = undefined;
+  destinations = [];
+  scrollPositions = [];
+  scrollArguments = [];
+  stitchedHeights = [];
+  pageHeight = 1500;
+  closeOnSecondScroll = false;
+  pageUnavailable = false;
   fakeChrome = makeChrome();
   vi.stubGlobal('chrome', fakeChrome);
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -130,12 +257,106 @@ describe('screenshot capture overlay lifecycle', () => {
       expect(events.slice(index + 1).indexOf('overlay:show')).toBeGreaterThanOrEqual(0);
     }
     expect(events.indexOf('overlay:show')).toBeLessThan(snapshots[0]);
-    expect(events.indexOf('stitchTiles')).toBeLessThan(events.lastIndexOf('overlay:remove'));
+    expect(events.indexOf('stitchCaptureSection')).toBeLessThan(
+      events.lastIndexOf('overlay:remove'),
+    );
     expect(events.at(-1)).toBe('overlay:remove');
     expect(messages.some((m) => m.type === 'CAPTURE_COMPLETE')).toBe(true);
   });
 
-  it.each(['snapshot:1', 'snapshot:2', 'prepareCapture', 'overlay:show', 'stitchTiles', 'deliver'])(
+  it('stops at the actual bottom and does not allocate a transparent tail', async () => {
+    await capture();
+    expect(scrollPositions).toEqual([0, 540, 900, 900]);
+    expect(captures).toBe(3);
+    expect(stitchedHeights).toEqual([1500]);
+    expect(finishedBundle).toMatchObject({ width: 800, height: 1500, incomplete: false });
+    expect(destinations).toEqual(['src/editor/index.html']);
+  });
+
+  it('passes the configured scroll pause and image wait to every scroll step', async () => {
+    await capture();
+    expect(scrollArguments.length).toBeGreaterThan(1);
+    for (const args of scrollArguments) {
+      expect(args.slice(1)).toEqual([1500, true, 10000]);
+    }
+  });
+
+  it('captures a 117,812 px page into bounded sections without reducing resolution', async () => {
+    pageHeight = 117812;
+    await capture();
+    expect(finishedBundle).toMatchObject({
+      width: 800,
+      height: 117812,
+      incomplete: false,
+      warnings: [],
+    });
+    expect(finishedBundle?.parts).toHaveLength(8);
+    expect(finishedBundle?.parts.at(-1)).toMatchObject({ y: 112000, height: 5812 });
+    expect(stitchedHeights.reduce((total, height) => total + height, 0)).toBe(117812);
+    expect(Math.max(...stitchedHeights)).toBeLessThanOrEqual(16000);
+    expect(destinations).toEqual(['src/capture-results/index.html?id=local-test-capture']);
+    expect(messages.some((m) => m.type === 'CAPTURE_COMPLETE')).toBe(true);
+    expect(messages.some((m) => m.type === 'CAPTURE_ERROR')).toBe(false);
+    expect(events.at(-1)).toBe('overlay:remove');
+  });
+
+  it('preserves completed pixels and marks a later capture failure as partial', async () => {
+    failAt = 'snapshot:2';
+    await capture();
+    expect(captures).toBe(2);
+    expect(finishedBundle).toMatchObject({ width: 800, height: 600, incomplete: true });
+    expect(finishedBundle?.warnings).toContain('capture failed');
+    expect(stitchedHeights).toEqual([600]);
+    expect(destinations).toEqual(['src/capture-results/index.html?id=local-test-capture']);
+    expect(events).toContain('restoreCapture');
+    expect(events.at(-1)).toBe('overlay:remove');
+    expect(messages.some((m) => m.type === 'CAPTURE_COMPLETE')).toBe(true);
+    expect(messages.some((m) => m.type === 'CAPTURE_ERROR')).toBe(false);
+  });
+
+  it('takes no screenshot if the source tab is no longer active before capture', async () => {
+    switchOnScroll = true;
+    await capture();
+    expect(captures).toBe(0);
+    expect(partData).toEqual([]);
+    expect(destinations).toEqual([]);
+    expect(events).toContain('restoreCapture');
+    expect(events.at(-1)).toBe('overlay:remove');
+    expect(messages.some((m) => m.type === 'CAPTURE_ERROR')).toBe(true);
+  });
+
+  it('saves the pending image section even if the source tab closes before the next scroll', async () => {
+    closeOnSecondScroll = true;
+    await capture();
+    expect(pageUnavailable).toBe(true);
+    expect(captures).toBe(1);
+    expect(stitchedHeights).toEqual([600]);
+    expect(partData).toEqual(['data:image/png;base64,finished']);
+    expect(finishedBundle).toMatchObject({ width: 800, height: 600, incomplete: true });
+    expect(finishedBundle?.warnings).toContain('The source tab closed.');
+    expect(destinations).toEqual(['src/capture-results/index.html?id=local-test-capture']);
+    expect(events).toContain('restoreCapture');
+    expect(events.at(-1)).toBe('overlay:remove');
+    expect(messages.some((m) => m.type === 'CAPTURE_COMPLETE')).toBe(true);
+    expect(messages.some((m) => m.type === 'CAPTURE_ERROR')).toBe(false);
+  });
+
+  it('discards a screenshot if the active tab changes while Chrome captures it', async () => {
+    switchAfterSnapshot = 2;
+    await capture();
+    expect(captures).toBe(2);
+    // The second image may show the newly active tab; only the first is kept.
+    expect(finishedBundle).toMatchObject({ width: 800, height: 600, incomplete: true });
+    expect(finishedBundle?.warnings.some((warning) => warning.includes('switched tabs'))).toBe(
+      true,
+    );
+    expect(stitchedHeights).toEqual([600]);
+    expect(destinations).toEqual(['src/capture-results/index.html?id=local-test-capture']);
+    expect(events).toContain('restoreCapture');
+    expect(events.at(-1)).toBe('overlay:remove');
+  });
+
+  it.each(['snapshot:1', 'prepareCapture', 'overlay:show', 'stitchCaptureSection', 'deliver'])(
     'restores the page and removes the overlay when %s fails',
     async (stage) => {
       failAt = stage;

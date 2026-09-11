@@ -5,6 +5,7 @@
 
 import type { RecMessage } from './recording-types';
 import { tokens } from './design-tokens';
+import { DEFAULT_FULL_PAGE_SETTINGS, type FullPageCaptureSettings } from './capture-settings';
 
 /** The three capture modes offered in the popup. */
 export type CaptureMode = 'full-page' | 'visible' | 'region';
@@ -148,7 +149,7 @@ export type CaptureAction = 'editor' | 'clipboard' | 'download';
 export type ExportFormat = 'png' | 'jpeg' | 'webp' | 'pdf';
 export type ThemePreference = 'light' | 'dark' | 'system';
 
-export interface Settings {
+export interface Settings extends FullPageCaptureSettings {
   defaultFormat: ExportFormat;
   theme: ThemePreference;
   // PDF defaults (used from M3 onward; stored now so settings are stable)
@@ -181,6 +182,7 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+  ...DEFAULT_FULL_PAGE_SETTINGS,
   defaultFormat: 'png',
   theme: 'system',
   pdfPageSize: 'a4',
